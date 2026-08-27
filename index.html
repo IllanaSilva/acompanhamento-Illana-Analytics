@@ -1,0 +1,2748 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meu Painel — Organização Pessoal</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root[data-theme="light"]{
+    --bg:#F2F6F2;
+    --sidebar-bg:#FFFFFF;
+    --header-bg:#1F4D36;
+    --header-bg2:#173B29;
+    --card-bg:#FFFFFF;
+    --card-border:#E0E7E0;
+    --text:#1C2B22;
+    --text-faint:#7C8B7F;
+    --green:#1F4D36;
+    --green-light:#3B6D11;
+    --green-soft:#E7F0E4;
+    --accent:#2F6B3F;
+    --accent-soft:#E7F0E4;
+    --amber:#D98E3B;
+    --amber-soft:#FBF0DF;
+    --red:#B23A34;
+    --red-soft:#F7E4E2;
+    --gray:#9AA79E;
+    --shadow:0 1px 2px rgba(31,77,54,.05), 0 4px 14px rgba(31,77,54,.06);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B120E;
+    --sidebar-bg:#0A0F0C;
+    --header-bg:#0D1712;
+    --header-bg2:#0A120E;
+    --card-bg:#111C15;
+    --card-border:#213026;
+    --text:#E9F3EC;
+    --text-faint:#7E9788;
+    --green:#4C8A6A;
+    --green-light:#3ED17E;
+    --green-soft:#16261C;
+    --accent:#3ED17E;
+    --accent-soft:rgba(62,209,126,.13);
+    --amber:#E3A458;
+    --amber-soft:#2E2417;
+    --red:#E5726A;
+    --red-soft:#2E1C1B;
+    --gray:#6C8177;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 4px 16px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:Arial, Helvetica, sans-serif;
+    min-height:100vh;
+    transition:background .2s ease, color .2s ease;
+  }
+
+  /* ---------- Layout: sidebar + conteúdo ---------- */
+  .app-shell{display:flex;min-height:100vh;}
+  .sidebar{
+    width:230px;flex-shrink:0;background:var(--sidebar-bg);border-right:1px solid var(--card-border);
+    display:flex;flex-direction:column;padding:22px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .sidebar-logo{display:flex;align-items:center;gap:10px;padding:0 6px 20px;}
+  .sidebar-logo .logo-emoji{font-size:22px;}
+  .sidebar-logo .logo-title{font-size:14px;font-weight:bold;letter-spacing:.03em;}
+  .sidebar-logo .logo-sub{font-size:10.5px;color:var(--text-faint);margin-top:1px;}
+  .sidebar-nav{display:flex;flex-direction:column;gap:2px;flex:1;}
+  .nav-section{
+    font-size:10px;font-weight:bold;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;
+    padding:16px 10px 6px;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:10px;background:none;border:none;color:var(--text);
+    padding:9px 10px;border-radius:9px;font-size:13.5px;font-family:Arial,Helvetica,sans-serif;
+    cursor:pointer;text-align:left;width:100%;
+  }
+  .nav-item:hover{background:var(--accent-soft);}
+  .nav-item.active{background:var(--green-light);color:#fff;font-weight:bold;}
+  [data-theme="dark"] .nav-item.active{color:#07130D;}
+  .nav-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+  .sidebar-bottom{border-top:1px solid var(--card-border);padding-top:10px;margin-top:10px;display:flex;flex-direction:column;gap:2px;}
+  .sync-pill{font-size:10.5px;color:var(--text-faint);padding:8px 10px;}
+
+  .mobile-topbar{
+    display:none;background:linear-gradient(135deg, var(--header-bg) 0%, var(--header-bg2) 100%);
+    color:#fff;padding:14px 18px;align-items:center;gap:12px;position:sticky;top:0;z-index:60;
+  }
+  .mobile-topbar button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;
+    border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;}
+  .mobile-topbar .mt-title{font-size:14.5px;font-weight:bold;}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:59;}
+
+  .content-wrap{flex:1;min-width:0;}
+  .icon-btn{
+    background:none;color:var(--text-faint);border:1px solid var(--card-border);
+    padding:8px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;
+    font-family:Arial, Helvetica, sans-serif;
+  }
+  .icon-btn:hover{border-color:var(--green-light);color:var(--green-light);}
+
+  .main{max-width:1180px;margin:0 auto;padding:24px 26px 70px;}
+  .page{display:none;}
+  .page.active{display:block;}
+
+  @media(max-width:900px){
+    .sidebar{position:fixed;left:-250px;top:0;z-index:61;transition:left .2s ease;width:230px;}
+    .sidebar.open{left:0;}
+    .sidebar.open ~ .sidebar-overlay{display:block;}
+    .mobile-topbar{display:flex;}
+    .main{padding:18px 16px 60px;}
+  }
+
+  /* ---------- KPI row ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+  .kpi-card{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;
+    padding:14px 16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:11px;
+  }
+  .kpi-icon{
+    width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;
+  }
+  .kpi-num{font-size:22px;font-weight:bold;color:var(--green);line-height:1.1;}
+  [data-theme="dark"] .kpi-num{color:var(--green-light);}
+  .kpi-label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+
+  /* ---------- Board head ---------- */
+  .page-title{font-size:18px;font-weight:bold;margin:0 0 2px;}
+  .page-subtitle{font-size:12.5px;color:var(--text-faint);margin:0 0 18px;}
+  .board-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .btn-primary{
+    background:var(--green-light);color:#fff;border:none;border-radius:8px;
+    padding:9px 16px;font-weight:bold;font-size:13px;cursor:pointer;font-family:Arial, Helvetica, sans-serif;
+  }
+  .btn-primary:hover{opacity:.9;}
+  .btn-ghost{
+    background:none;border:1px solid var(--card-border);color:var(--text-faint);border-radius:8px;
+    padding:8px 14px;font-size:12.5px;cursor:pointer;font-family:Arial, Helvetica, sans-serif;
+  }
+  .btn-ghost:hover{border-color:var(--green-light);color:var(--green-light);}
+
+  /* ---------- Kanban ---------- */
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .column{
+    background:rgba(0,0,0,.015);border:1px dashed var(--card-border);border-radius:10px;padding:12px;min-height:180px;
+  }
+  [data-theme="dark"] .column{background:rgba(255,255,255,.02);}
+  .column.dragover{background:var(--green-soft);border-color:var(--green-light);}
+  .column-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 2px;}
+  .column-head h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);margin:0;}
+  .col-count{font-size:11.5px;background:var(--card-border);color:var(--text);padding:1px 8px;border-radius:999px;}
+
+  .card{
+    background:var(--card-bg);border-radius:9px;padding:12px;margin-bottom:9px;
+    box-shadow:var(--shadow);cursor:grab;border-left:3px solid var(--gray);
+  }
+  .card.p-baixa{border-left-color:#8FAE7A;}
+  .card.p-media{border-left-color:var(--amber);}
+  .card.p-alta{border-left-color:var(--red);}
+  .card:active{cursor:grabbing;}
+  .card.dragging{opacity:.4;}
+  .card-title{font-weight:bold;font-size:14px;line-height:1.35;}
+  .card-desc{font-size:12.5px;color:var(--text-faint);margin:6px 0 9px;line-height:1.4;}
+  .card-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .chip{font-size:10.5px;padding:2px 8px;border-radius:999px;background:var(--green-soft);color:var(--green);}
+  [data-theme="dark"] .chip{color:var(--green-light);}
+  .chip.due.soon{background:var(--amber-soft);color:#8A5A17;}
+  [data-theme="dark"] .chip.due.soon{color:var(--amber);}
+  .chip.due.late{background:var(--red-soft);color:var(--red);}
+  .card-links{margin-top:7px;display:flex;flex-direction:column;gap:3px;}
+  .card-links a{font-size:11.5px;color:var(--green-light);text-decoration:none;word-break:break-all;}
+  .card-links a:hover{text-decoration:underline;}
+  .card-actions{display:flex;justify-content:space-between;align-items:center;margin-top:9px;padding-top:8px;border-top:1px solid var(--card-border);}
+  .move-btns{display:flex;gap:4px;}
+  .mini-btn{border:none;background:transparent;cursor:pointer;color:var(--text-faint);font-size:12.5px;padding:3px 6px;border-radius:5px;font-family:Arial;}
+  .mini-btn:hover{background:var(--card-border);color:var(--text);}
+  .empty-hint{font-size:12px;color:var(--text-faint);text-align:center;padding:18px 6px;}
+
+  /* ---------- Rotina ---------- */
+  .week-banner{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;
+    padding:14px 18px;margin-bottom:18px;box-shadow:var(--shadow);
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+  }
+  .week-title{font-size:15px;font-weight:bold;}
+  .week-dates{font-size:12px;color:var(--text-faint);}
+  .week{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;}
+  .day-col{
+    background:var(--card-bg);border-radius:10px;padding:12px;box-shadow:var(--shadow);
+    border:2px solid transparent;min-height:210px;
+  }
+  .day-col.today{border-color:var(--green-light);}
+  .day-name{font-size:14.5px;font-weight:bold;}
+  .day-date{font-size:11px;color:var(--text-faint);}
+  .day-progress{height:4px;border-radius:3px;background:var(--card-border);margin-top:8px;overflow:hidden;}
+  .day-progress-bar{height:100%;background:var(--green-light);border-radius:3px;}
+  .routine-item{display:flex;gap:7px;align-items:flex-start;padding:6px 4px;border-radius:6px;}
+  .routine-item:hover{background:var(--green-soft);}
+  .routine-item input[type=checkbox]{margin-top:2px;accent-color:var(--green-light);cursor:pointer;}
+  .routine-item.done .r-title{text-decoration:line-through;color:var(--text-faint);}
+  .routine-item.fixo{background:var(--green-soft);border-radius:6px;}
+  [data-theme="dark"] .routine-item.fixo{background:rgba(111,174,71,.1);}
+  .r-pin{font-size:10px;margin-right:2px;}
+  .r-body{flex:1;min-width:0;}
+  .r-time{font-size:10px;color:var(--green-light);display:block;font-weight:bold;}
+  .r-title{font-size:12.5px;font-weight:bold;}
+  .r-notes{font-size:11px;color:var(--text-faint);}
+  .r-del{opacity:0;transition:opacity .1s;}
+  .routine-item:hover .r-del{opacity:1;}
+  .add-item-btn{
+    width:100%;text-align:left;background:none;border:1px dashed var(--card-border);
+    border-radius:7px;padding:6px 8px;font-size:11.5px;color:var(--text-faint);cursor:pointer;margin-top:6px;font-family:Arial;
+  }
+  .add-item-btn:hover{border-color:var(--green-light);color:var(--green-light);}
+
+  .footer-note{text-align:center;color:var(--text-faint);font-size:11px;margin-top:30px;}
+
+  /* ---------- KPI clicável (chamados/bases) ---------- */
+  .kpi-card.clickable{cursor:pointer;transition:border-color .12s ease;}
+  .kpi-card.clickable:hover{border-color:var(--green-light);}
+  .kpi-card.kpi-active{border-color:var(--green-light);box-shadow:0 0 0 2px var(--green-light) inset;}
+
+  /* ---------- Lista (chamados/bases) ---------- */
+  .list-wrap .empty-hint{padding:30px 6px;}
+
+  /* ---------- Tabela de dados (Chamados) ---------- */
+  .table-wrap{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .data-table thead th{
+    text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);
+    padding:12px 16px;border-bottom:1px solid var(--card-border);background:var(--bg);
+  }
+  .data-table tbody td{padding:12px 16px;border-bottom:1px solid var(--card-border);vertical-align:middle;}
+  .data-table tbody tr:last-child td{border-bottom:none;}
+  .data-table tbody tr{cursor:pointer;transition:background .1s ease;}
+  .data-table tbody tr:hover{background:var(--accent-soft);}
+  .dt-ticket{font-weight:bold;font-size:12px;color:var(--text-faint);}
+  .dt-assunto{font-weight:bold;}
+  .dt-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
+  .dt-edit{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:13px;}
+  .dt-edit:hover{color:var(--green-light);}
+  .table-wrap .empty-hint{padding:44px 20px;text-align:center;font-size:13px;line-height:1.8;}
+  .list-item{
+    background:var(--card-bg);border:1px solid var(--card-border);border-left:3px solid var(--gray);
+    border-radius:9px;padding:13px 15px;margin-bottom:10px;box-shadow:var(--shadow);
+  }
+  .list-item.st-iniciado{border-left-color:#4A90D9;}
+  .list-item.st-andamento{border-left-color:var(--amber);}
+  .list-item.st-aguardando_retorno{border-left-color:#9B6FD0;}
+  .list-item.st-concluido{border-left-color:var(--green-light);}
+  .list-item.st-aguardando_fornecedora{border-left-color:var(--gray);}
+  .list-item.st-sem_conclusao{border-left-color:var(--red);}
+  .list-item.bs-a_iniciar{border-left-color:var(--gray);}
+  .list-item.bs-em_analise{border-left-color:var(--amber);}
+  .list-item.bs-processada{border-left-color:var(--green-light);}
+  .item-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+  .item-title{font-weight:bold;font-size:14px;}
+  .item-meta{font-size:11px;color:var(--text-faint);margin-top:3px;}
+  .status-badge{font-size:11px;padding:3px 10px;border-radius:999px;background:var(--green-soft);color:var(--green);white-space:nowrap;font-weight:bold;}
+  [data-theme="dark"] .status-badge{color:var(--green-light);}
+  .item-desc{font-size:12.5px;color:var(--text-faint);margin:8px 0 0;}
+  .item-links{margin-top:7px;}
+  .item-links a{font-size:11.5px;color:var(--green-light);text-decoration:none;}
+  .item-links a:hover{text-decoration:underline;}
+  .edit-status-row{display:flex;gap:6px;margin-top:10px;align-items:center;}
+  .edit-status-row select{flex:1;border:1px solid var(--card-border);border-radius:7px;padding:6px 8px;background:var(--bg);color:var(--text);font-family:Arial;font-size:12.5px;}
+  .item-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--card-border);}
+  .filter-tag{
+    display:inline-block;font-size:11.5px;background:var(--green-soft);color:var(--green);
+    padding:4px 10px;border-radius:999px;margin-bottom:12px;
+  }
+  [data-theme="dark"] .filter-tag{color:var(--green-light);}
+  .filter-tag button{background:none;border:none;color:inherit;cursor:pointer;font-weight:bold;margin-left:4px;}
+
+  /* ---------- Início ---------- */
+  .inicio-header{
+    display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px;
+  }
+  .inicio-greeting{font-size:24px;font-weight:bold;}
+  .inicio-quote{font-size:13px;color:var(--text-faint);font-style:italic;margin-top:4px;}
+  .inicio-pills{display:flex;gap:10px;flex-wrap:wrap;}
+  .pill-info{
+    display:flex;align-items:center;gap:9px;background:var(--card-bg);border:1px solid var(--card-border);
+    border-radius:11px;padding:9px 14px;box-shadow:var(--shadow);
+  }
+  .pill-icon{font-size:17px;}
+  .pill-main{font-size:12.5px;font-weight:bold;}
+  .pill-sub{font-size:10.5px;color:var(--text-faint);}
+
+  .foco-card{
+    display:flex;justify-content:space-between;gap:20px;background:var(--card-bg);border:1px solid var(--card-border);
+    border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);margin-bottom:24px;flex-wrap:wrap;
+  }
+  .foco-title{font-size:12.5px;font-weight:bold;color:var(--accent);letter-spacing:.04em;display:flex;align-items:center;gap:7px;}
+  .foco-sub{font-size:11.5px;color:var(--text-faint);margin:3px 0 14px;}
+  .foco-item{display:flex;align-items:center;gap:10px;padding:7px 2px;}
+  .foco-item input[type=checkbox]{accent-color:var(--green-light);cursor:pointer;width:15px;height:15px;}
+  .foco-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .foco-dot.p-alta{background:var(--red);}
+  .foco-dot.p-media{background:var(--amber);}
+  .foco-dot.p-baixa{background:var(--green-light);}
+  .foco-item-title{font-size:13px;flex:1;}
+  .foco-chip{font-size:10px;font-weight:bold;padding:2px 9px;border-radius:999px;}
+  .foco-chip.alta{background:var(--red-soft);color:var(--red);}
+  .foco-chip.media{background:var(--amber-soft);color:var(--amber);}
+  .foco-chip.baixa{background:var(--green-soft);color:var(--green-light);}
+  .foco-empty{font-size:12.5px;color:var(--text-faint);padding:10px 2px;}
+  .foco-right{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    min-width:120px;border-left:1px solid var(--card-border);padding-left:20px;
+  }
+  .foco-right-icon{
+    width:46px;height:46px;border-radius:12px;background:var(--accent-soft);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:8px;
+  }
+  .foco-right-num{font-size:22px;font-weight:bold;}
+  .foco-right-label{font-size:11px;color:var(--text-faint);}
+  .foco-right-sub{font-size:10.5px;color:var(--accent);margin-top:2px;font-weight:bold;}
+
+  .section-label{
+    font-size:11.5px;font-weight:bold;color:var(--text-faint);text-transform:uppercase;
+    letter-spacing:.05em;margin-bottom:12px;
+  }
+  .quick-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
+  .quick-card{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;
+    padding:20px 14px 16px;box-shadow:var(--shadow);cursor:pointer;text-align:center;
+    transition:transform .12s ease,border-color .12s ease;
+  }
+  .quick-card:hover{transform:translateY(-2px);border-color:var(--accent);}
+  .quick-card .qc-icon-box{
+    width:48px;height:48px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--accent);
+    color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 12px;
+  }
+  .quick-card .qc-title{font-size:13.5px;font-weight:bold;margin-bottom:4px;}
+  .quick-card .qc-sub{font-size:10.5px;color:var(--text-faint);line-height:1.4;}
+  .quick-card .qc-underline{height:3px;width:34px;background:var(--accent);border-radius:3px;margin:12px auto 0;}
+  @media(max-width:900px){ .quick-grid{grid-template-columns:1fr 1fr 1fr;} }
+  @media(max-width:560px){ .quick-grid{grid-template-columns:1fr 1fr;} }
+
+  .inicio-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:800px){ .inicio-bottom-grid{grid-template-columns:1fr;} }
+  .panel-card{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;
+    padding:18px 20px;box-shadow:var(--shadow);
+  }
+  .panel-title{font-size:11.5px;font-weight:bold;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;}
+  .day-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--card-border);}
+  .day-row:last-of-type{border-bottom:none;}
+  .day-badge{
+    background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:6px 8px;text-align:center;
+    min-width:42px;flex-shrink:0;
+  }
+  .day-badge .db-dow{font-size:9.5px;font-weight:bold;letter-spacing:.03em;}
+  .day-badge .db-num{font-size:15px;font-weight:bold;}
+  .day-row-body{flex:1;min-width:0;}
+  .day-row-title{font-size:12.5px;font-weight:bold;}
+  .day-row-sub{font-size:11px;color:var(--text-faint);}
+  .day-row-cal{color:var(--text-faint);font-size:14px;}
+  .activity-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:1px solid var(--card-border);}
+  .activity-row:last-of-type{border-bottom:none;}
+  .activity-icon{
+    width:28px;height:28px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-size:13px;background:var(--accent-soft);color:var(--accent);
+  }
+  .activity-body{flex:1;min-width:0;}
+  .activity-title{font-size:12.5px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .activity-tag{
+    font-size:9.5px;background:var(--card-border);color:var(--text-faint);padding:1px 7px;border-radius:999px;
+    display:inline-block;margin-top:2px;
+  }
+  .activity-time{font-size:10.5px;color:var(--text-faint);white-space:nowrap;flex-shrink:0;}
+  .panel-link{
+    display:block;width:100%;text-align:center;background:none;border:none;color:var(--accent);
+    font-size:12px;font-weight:bold;cursor:pointer;margin-top:14px;padding:6px;font-family:Arial;
+  }
+  .panel-link:hover{text-decoration:underline;}
+  .panel-empty{font-size:12px;color:var(--text-faint);padding:8px 2px;}
+
+  /* ---------- Matriz ---------- */
+  .forn-breadcrumb{font-size:11px;font-weight:bold;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+  .forn-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px;}
+  .forn-chip{
+    background:var(--card-bg);border:1px solid var(--card-border);color:var(--text);
+    padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:bold;cursor:pointer;font-family:Arial;
+  }
+  .forn-chip:hover{border-color:var(--green-light);}
+  .forn-chip.active{background:var(--green);border-color:var(--green);color:#fff;}
+  [data-theme="dark"] .forn-chip.active{background:var(--green-light);border-color:var(--green-light);color:#0D1712;}
+  .forn-chip.add{border-style:dashed;color:var(--text-faint);background:none;}
+  .forn-section{margin-bottom:26px;}
+  .forn-section-title{
+    font-size:14px;font-weight:bold;color:var(--text);margin-bottom:10px;padding-bottom:6px;
+    border-bottom:2px solid var(--card-border);
+  }
+  .back-link{
+    background:none;border:1px solid var(--card-border);color:var(--text-faint);
+    border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:Arial;margin-bottom:14px;
+  }
+  .back-link:hover{border-color:var(--green-light);color:var(--green-light);}
+  .bases-cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+  @media(max-width:700px){ .bases-cat-grid{grid-template-columns:1fr;} }
+  .cat-card{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;
+    padding:22px;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:center;gap:16px;
+    transition:transform .12s ease,border-color .12s ease;
+  }
+  .cat-card:hover{transform:translateY(-2px);border-color:var(--accent);}
+  .cat-card .cat-icon{
+    width:52px;height:52px;border-radius:13px;background:var(--accent-soft);border:1px solid var(--accent);
+    color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;
+  }
+  .cat-card .cat-title{font-size:16px;font-weight:bold;}
+  .cat-card .cat-sub{font-size:12px;color:var(--text-faint);margin-top:2px;}
+  .cat-card .cat-num{font-size:26px;font-weight:bold;color:var(--green);margin-left:auto;}
+  [data-theme="dark"] .cat-card .cat-num{color:var(--green-light);}
+  .forn-breakdown-row{
+    display:flex;justify-content:space-between;align-items:center;background:var(--card-bg);
+    border:1px solid var(--card-border);border-radius:10px;padding:13px 16px;margin-bottom:9px;
+    cursor:pointer;box-shadow:var(--shadow);
+  }
+  .forn-breakdown-row:hover{border-color:var(--accent);}
+  .forn-breakdown-name{font-size:13.5px;font-weight:bold;}
+  .forn-breakdown-count{font-size:12px;color:var(--text-faint);}
+  .forn-breakdown-count b{color:var(--green);}
+  [data-theme="dark"] .forn-breakdown-count b{color:var(--green-light);}
+  .drill-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px;}
+  @media(max-width:900px){ .drill-grid{grid-template-columns:1fr 1fr 1fr;} }
+  @media(max-width:600px){ .drill-grid{grid-template-columns:1fr 1fr;} }
+  .drill-card{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:13px;
+    padding:18px 14px;box-shadow:var(--shadow);cursor:pointer;text-align:center;
+    transition:transform .12s ease,border-color .12s ease;
+  }
+  .drill-card:hover{transform:translateY(-2px);border-color:var(--accent);}
+  .drill-card .dc-icon{font-size:22px;margin-bottom:8px;}
+  .drill-card .dc-title{font-size:13px;font-weight:bold;margin-bottom:4px;}
+  .drill-card .dc-num{font-size:20px;font-weight:bold;color:var(--green);}
+  [data-theme="dark"] .drill-card .dc-num{color:var(--green-light);}
+  .drill-card .dc-label{font-size:10.5px;color:var(--text-faint);}
+  .file-row{
+    display:flex;align-items:center;gap:12px;background:var(--card-bg);border:1px solid var(--card-border);
+    border-radius:10px;padding:12px 15px;margin-bottom:9px;box-shadow:var(--shadow);
+  }
+  .file-row input[type=checkbox]{accent-color:var(--green-light);cursor:pointer;flex-shrink:0;}
+  .file-row-icon{font-size:16px;flex-shrink:0;}
+  .file-row-body{flex:1;min-width:0;}
+  .file-row-name{font-size:13px;font-weight:bold;}
+  .file-row-name.tratado-text{text-decoration:line-through;color:var(--text-faint);}
+  .file-row-meta{font-size:11px;color:var(--text-faint);margin-top:2px;}
+  .file-row-meta a{color:var(--green-light);text-decoration:none;}
+  .file-row-meta a:hover{text-decoration:underline;}
+  .file-row-actions{flex-shrink:0;}
+  .combo-group{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;
+    margin-bottom:14px;box-shadow:var(--shadow);overflow:hidden;
+  }
+  .combo-group.diag{border-left:4px solid var(--green-light);}
+  .combo-group.div{border-left:4px solid var(--amber);}
+  .combo-head{
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+    padding:12px 15px;background:var(--green-soft);
+  }
+  [data-theme="dark"] .combo-head{background:rgba(255,255,255,.03);}
+  .combo-title{font-size:13.5px;font-weight:bold;}
+  .combo-total{font-size:12px;color:var(--text-faint);}
+  .combo-total b{color:var(--green);font-size:14px;}
+  [data-theme="dark"] .combo-total b{color:var(--green-light);}
+  .combo-body{padding:6px 10px;}
+  .anot-item{display:flex;gap:10px;align-items:flex-start;padding:9px 6px;border-bottom:1px solid var(--card-border);}
+  .anot-item:last-child{border-bottom:none;}
+  .anot-item.tratado{opacity:.55;}
+  .anot-item input[type=checkbox]{margin-top:3px;accent-color:var(--green-light);cursor:pointer;}
+  .anot-qtd{
+    font-weight:bold;font-size:13.5px;color:var(--green);min-width:56px;flex-shrink:0;
+  }
+  [data-theme="dark"] .anot-qtd{color:var(--green-light);}
+  .anot-body{flex:1;min-width:0;}
+  .anot-desc{font-size:13px;line-height:1.4;}
+  .anot-desc.tratado-text{text-decoration:line-through;}
+  .anot-meta{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+  .anot-actions{display:flex;gap:2px;flex-shrink:0;}
+  .combo-add-row{padding:8px 10px;}
+
+  /* ---------- Bases: sub-navegação e blocos de mês ---------- */
+  .subnav{display:flex;gap:8px;margin-bottom:18px;}
+  .subnav-btn{
+    background:var(--card-bg);border:1px solid var(--card-border);color:var(--text);
+    padding:8px 16px;border-radius:8px;font-size:13px;font-weight:bold;cursor:pointer;font-family:Arial;
+  }
+  .subnav-btn:hover{border-color:var(--green-light);}
+  .subnav-btn.active{background:var(--green);border-color:var(--green);color:#fff;}
+  [data-theme="dark"] .subnav-btn.active{background:var(--green-light);border-color:var(--green-light);color:#0D1712;}
+  .submonth-block{margin-bottom:4px;}
+  .submonth-title{font-size:11px;font-weight:bold;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;padding:10px 6px 3px;}
+  .chevron{display:inline-block;transition:transform .12s ease;color:var(--text-faint);font-size:11px;}
+  .chevron.open{transform:rotate(90deg);}
+
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed;bottom:20px;right:20px;background:var(--header-bg);color:#fff;
+    padding:11px 16px;border-radius:8px;font-size:12.5px;max-width:320px;
+    box-shadow:0 6px 20px rgba(0,0,0,.3);z-index:200;opacity:0;transform:translateY(10px);
+    transition:all .25s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(16,27,21,.5);
+    align-items:flex-start;justify-content:center;padding:6vh 16px;overflow-y:auto;z-index:50;
+  }
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--card-bg);border-radius:12px;max-width:460px;width:100%;
+    padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);border:1px solid var(--card-border);
+  }
+  .modal h3{font-size:16.5px;margin:0 0 16px;}
+  .field{margin-bottom:13px;}
+  .field label{display:block;font-size:11px;font-weight:bold;color:var(--text-faint);text-transform:uppercase;letter-spacing:.03em;margin-bottom:5px;}
+  .field input[type=text],.field input[type=date],.field input[type=time],.field textarea,.field select{
+    width:100%;border:1px solid var(--card-border);border-radius:7px;padding:8px 10px;
+    font-family:Arial, Helvetica, sans-serif;font-size:13.5px;color:var(--text);background:var(--bg);
+  }
+  .field input:focus,.field textarea:focus,.field select:focus{outline:2px solid var(--green-light);outline-offset:1px;}
+  .field textarea{resize:vertical;min-height:56px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .link-row{display:flex;gap:6px;margin-bottom:6px;}
+  .link-row input{flex:1;}
+  .link-row button{border:none;background:var(--red-soft);color:var(--red);border-radius:7px;width:30px;cursor:pointer;font-size:13px;}
+  .add-link-btn{font-size:12px;color:var(--green-light);background:none;border:none;cursor:pointer;padding:2px 0;font-weight:bold;}
+  .an-linha-row{display:flex;gap:6px;margin-bottom:6px;align-items:center;}
+  .an-linha-row input.an-qtd{width:80px;flex-shrink:0;}
+  .an-linha-row input.an-desc{flex:1;}
+  .an-linha-row label{display:flex;align-items:center;gap:3px;font-size:10.5px;color:var(--text-faint);flex-shrink:0;white-space:nowrap;}
+  .an-linha-row button{border:none;background:var(--red-soft);color:var(--red);border-radius:7px;width:28px;height:32px;cursor:pointer;font-size:13px;flex-shrink:0;}
+  .day-checks{display:flex;flex-wrap:wrap;gap:6px;}
+  .day-checks label{font-size:12px;border:1px solid var(--card-border);border-radius:999px;padding:5px 11px;cursor:pointer;}
+  .day-checks input{margin-right:5px;accent-color:var(--green-light);}
+  .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;}
+  .modal-actions .right{display:flex;gap:8px;}
+  .link-del{color:var(--red);background:none;border:none;font-size:12px;cursor:pointer;}
+
+  /* ---------- Modal chamado (estilo acompanhamento-matriz) ---------- */
+  .modal-chamado{max-width:600px;padding:0;overflow:hidden;}
+  .modal-header-bar{
+    background:linear-gradient(135deg, var(--header-bg) 0%, var(--header-bg2) 100%);
+    color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;
+    font-weight:bold;font-size:16px;
+  }
+  .modal-close-x{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;opacity:.85;}
+  .modal-close-x:hover{opacity:1;}
+  .modal-chamado .modal-body{padding:20px 22px 6px;}
+  .modal-chamado .modal-actions{padding:14px 0 22px;margin-top:6px;}
+
+  @media(max-width:1100px){
+    .board{grid-template-columns:1fr 1fr;}
+  }
+  @media(max-width:900px){
+    .board{grid-template-columns:1fr;}
+    .week{grid-template-columns:1fr 1fr;}
+    .kpi-row{grid-template-columns:1fr 1fr;}
+  }
+  @media(max-width:520px){
+    .week{grid-template-columns:1fr;}
+    .row2{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-emoji">🌿</div>
+      <div>
+        <div class="logo-title">MEU PAINEL</div>
+        <div class="logo-sub">Organização pessoal</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item tab-btn active" data-page="inicio"><span class="nav-icon">🏠</span><span>Início</span></button>
+      <div class="nav-section">Organização</div>
+      <button class="nav-item tab-btn" data-page="demandas"><span class="nav-icon">📋</span><span>Demandas</span></button>
+      <button class="nav-item tab-btn" data-page="rotina"><span class="nav-icon">🗓️</span><span>Rotina</span></button>
+      <button class="nav-item tab-btn" data-page="chamados"><span class="nav-icon">🎫</span><span>Chamados</span></button>
+      <div class="nav-section">Arquivos</div>
+      <button class="nav-item tab-btn" data-page="matriz"><span class="nav-icon">🧩</span><span>Matriz</span></button>
+      <button class="nav-item tab-btn" data-page="bases"><span class="nav-icon">📂</span><span>Bases</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="nav-item" id="theme-toggle" onclick="alternarTema()"><span class="nav-icon">🌙</span><span>Modo escuro</span></button>
+      <button class="nav-item" onclick="resetarDados()"><span class="nav-icon">↺</span><span>Resetar dados</span></button>
+      <div class="sync-pill" id="sync-status">☁️ —</div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+
+  <div class="content-wrap">
+    <div class="mobile-topbar">
+      <button onclick="toggleSidebar()">☰</button>
+      <div class="mt-title">🌿 Meu Painel</div>
+    </div>
+
+    <div class="main">
+
+      <!-- ===================== PAGE: INÍCIO ===================== -->
+      <div class="page active" id="page-inicio">
+        <div class="inicio-header">
+          <div>
+            <div class="inicio-greeting" id="inicio-greeting">Olá!</div>
+            <div class="inicio-quote">"Organização não é sobre ter tempo, é sobre usar bem o que você tem."</div>
+          </div>
+          <div class="inicio-pills">
+            <div class="pill-info">
+              <span class="pill-icon">📅</span>
+              <div>
+                <div class="pill-main" id="pill-date-main"></div>
+                <div class="pill-sub" id="pill-date-sub"></div>
+              </div>
+            </div>
+            <div class="pill-info">
+              <span class="pill-icon" id="pill-greeting-icon">☀️</span>
+              <div>
+                <div class="pill-main" id="pill-greeting-main">Bom dia!</div>
+                <div class="pill-sub" id="pill-greeting-sub">Tenha um dia incrível.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="foco-card">
+          <div style="flex:1;min-width:220px;">
+            <div class="foco-title">🎯 FOCO DE HOJE</div>
+            <div class="foco-sub" id="foco-sub">Principais coisas pra focar</div>
+            <div id="foco-list"></div>
+          </div>
+          <div class="foco-right">
+            <div class="foco-right-icon">📋</div>
+            <div class="foco-right-num" id="foco-right-num">0</div>
+            <div class="foco-right-label">tarefas pendentes</div>
+            <div class="foco-right-sub">Faça acontecer!</div>
+          </div>
+        </div>
+
+        <div class="section-label">ACESSO RÁPIDO</div>
+        <div class="quick-grid" id="quick-grid"></div>
+
+        <div class="inicio-bottom-grid">
+          <div class="panel-card">
+            <div class="panel-title">PRÓXIMOS DIAS</div>
+            <div id="proximos-dias-list"></div>
+            <button class="panel-link" onclick="switchPage('rotina')">Ver rotina completa →</button>
+          </div>
+          <div class="panel-card">
+            <div class="panel-title">ATIVIDADE RECENTE</div>
+            <div id="atividade-recente-list"></div>
+            <button class="panel-link" onclick="switchPage('demandas')">Ver tudo →</button>
+          </div>
+        </div>
+
+        <div class="footer-note">Dados salvos automaticamente e sincronizados entre seus dispositivos.</div>
+      </div>
+
+      <!-- ===================== PAGE: DEMANDAS ===================== -->
+      <div class="page" id="page-demandas">
+        <div class="kpi-row" id="kpi-row"></div>
+
+        <div class="board-head">
+          <div>
+            <div class="page-title">Quadro de demandas</div>
+            <div class="page-subtitle">Arraste os cards entre as colunas ou use os botões ◀▶</div>
+          </div>
+      <button class="btn-primary" onclick="openCardModal()">+ Nova demanda</button>
+    </div>
+
+    <div class="board">
+      <div class="column" data-status="todo" ondragover="onDragOver(event)" ondrop="onDrop(event)">
+        <div class="column-head"><h3>A fazer</h3><span class="col-count" id="count-todo">0</span></div>
+        <div id="col-todo"></div>
+      </div>
+      <div class="column" data-status="doing" ondragover="onDragOver(event)" ondrop="onDrop(event)">
+        <div class="column-head"><h3>Em andamento</h3><span class="col-count" id="count-doing">0</span></div>
+        <div id="col-doing"></div>
+      </div>
+      <div class="column" data-status="waiting" ondragover="onDragOver(event)" ondrop="onDrop(event)">
+        <div class="column-head"><h3>Aguardando retorno</h3><span class="col-count" id="count-waiting">0</span></div>
+        <div id="col-waiting"></div>
+      </div>
+      <div class="column" data-status="done" ondragover="onDragOver(event)" ondrop="onDrop(event)">
+        <div class="column-head"><h3>Concluído</h3><span class="col-count" id="count-done">0</span></div>
+        <div id="col-done"></div>
+      </div>
+    </div>
+    <div class="footer-note">Dados salvos automaticamente no navegador.</div>
+  </div>
+
+  <!-- ===================== PAGE: MATRIZ ===================== -->
+  <div class="page" id="page-matriz">
+
+    <!-- NÍVEL 1: cards de fornecedora (com total de anotações) -->
+    <div id="matriz-forn-cards">
+      <div class="page-title">Matriz</div>
+      <div class="page-subtitle">Clique numa fornecedora para ver os meses</div>
+      <div class="kpi-row" id="matriz-overview-kpi-row"></div>
+      <div class="board-head">
+        <div></div>
+        <button class="btn-primary" onclick="openAnotacaoModal()">+ Nova anotação</button>
+      </div>
+      <div class="drill-grid" id="matriz-forn-cards-grid"></div>
+    </div>
+
+    <!-- NÍVEL 2: cards de mês (com total de anotações) -->
+    <div id="matriz-month-cards" style="display:none;">
+      <button class="back-link" onclick="backToMatrizFornCards()">← Fornecedoras</button>
+      <div class="page-title" id="matriz-month-cards-title">Fornecedora</div>
+      <div class="page-subtitle">Clique num mês para ver as anotações</div>
+      <div class="board-head">
+        <div></div>
+        <button class="btn-primary" onclick="openAnotacaoModal()">+ Nova anotação</button>
+      </div>
+      <div class="drill-grid" id="matriz-month-cards-grid"></div>
+    </div>
+
+    <!-- NÍVEL 3: anotações do mês, separadas por dia -->
+    <div id="matriz-day-list" style="display:none;">
+      <button class="back-link" onclick="backToMatrizMonthCards()">← Meses</button>
+      <div class="board-head">
+        <div>
+          <div class="page-title" id="matriz-day-list-title">Mês</div>
+          <div class="page-subtitle">Anotações separadas por dia</div>
+        </div>
+        <button class="btn-primary" onclick="openAnotacaoModal()">+ Nova anotação</button>
+      </div>
+      <div id="matriz-day-list-items"></div>
+    </div>
+
+    <div class="footer-note">Dados salvos automaticamente no navegador.</div>
+  </div>
+
+  <!-- ===================== PAGE: ROTINA ===================== -->
+  <div class="page" id="page-rotina">
+    <div class="week-banner">
+      <div>
+        <div class="week-title" id="week-title">Rotina da semana</div>
+        <div class="week-dates" id="week-dates"></div>
+      </div>
+      <button class="btn-ghost" onclick="resetWeek()">↺ Reiniciar marcações</button>
+    </div>
+    <div class="week" id="week-grid"></div>
+    <div class="footer-note">As marcações reiniciam automaticamente a cada nova semana.</div>
+  </div>
+
+  <!-- ===================== PAGE: CHAMADOS ===================== -->
+  <div class="page" id="page-chamados">
+    <div class="kpi-row" id="chamados-kpi-row"></div>
+    <div id="chamados-filter-tag"></div>
+
+    <div class="board-head">
+      <div>
+        <div class="page-title">Meus chamados</div>
+        <div class="page-subtitle">Tickets abertos por você, sejam de matriz ou de qualquer outro assunto</div>
+      </div>
+      <button class="btn-primary" onclick="openChamadoModal()">+ Novo chamado</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Ticket</th>
+            <th>Assunto</th>
+            <th>Fornecedora / Tipo</th>
+            <th>Status</th>
+            <th>Aberto em</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="chamados-tbody"></tbody>
+      </table>
+      <div class="empty-hint" id="chamados-empty" style="display:none;">
+        📋<br>Nenhum chamado registrado ainda.<br>
+        <span style="font-size:11.5px;">Clique em "+ Novo chamado" para abrir um ticket.</span>
+      </div>
+    </div>
+    <div class="footer-note">Dados salvos automaticamente no navegador.</div>
+  </div>
+
+  <!-- ===================== PAGE: BASES ===================== -->
+  <div class="page" id="page-bases">
+
+    <!-- NÍVEL 0: totais gerais + 2 cards de categoria -->
+    <div id="bases-overview">
+      <div class="page-title">Bases</div>
+      <div class="page-subtitle">Totais gerais, independente de serem da matriz ou de demais bases</div>
+      <div class="kpi-row" id="bases-overview-kpi-row"></div>
+
+      <div class="section-label" style="margin-top:8px;">CATEGORIAS</div>
+      <div class="bases-cat-grid" id="bases-cat-grid"></div>
+    </div>
+
+    <!-- NÍVEL 1: cards de fornecedora (com total de arquivos) -->
+    <div id="bases-forn-cards" style="display:none;">
+      <button class="back-link" onclick="showBasesOverview()">← Categorias</button>
+      <div class="page-title" id="bases-forn-cards-title">Matriz</div>
+      <div class="page-subtitle">Clique numa fornecedora para ver os meses</div>
+      <div class="field" style="max-width:340px;">
+        <label>Ir para outra fornecedora (mesmo sem arquivos ainda)</label>
+        <div style="display:flex;gap:8px;">
+          <select id="bases-breakdown-forn-select" style="flex:1;"></select>
+          <button class="btn-ghost" onclick="goToBasesFornFromSelect()">Ir →</button>
+        </div>
+      </div>
+      <div class="drill-grid" id="bases-forn-cards-grid"></div>
+    </div>
+
+    <!-- NÍVEL 2 (Matriz): cards de mês (com total de arquivos) -->
+    <div id="bases-month-cards" style="display:none;">
+      <button class="back-link" onclick="showBasesCategoryList('matriz')">← Fornecedoras · Matriz</button>
+      <div class="page-title" id="bases-month-cards-title">Fornecedora</div>
+      <div class="page-subtitle">Clique num mês para ver Análises e Ações</div>
+      <div class="drill-grid" id="bases-month-cards-grid"></div>
+    </div>
+
+    <!-- NÍVEL 3 (Matriz): cards Análises / Ações (com total de arquivos) -->
+    <div id="bases-tipo-cards" style="display:none;">
+      <button class="back-link" onclick="backToBasesMonthCards()">← Meses</button>
+      <div class="page-title" id="bases-tipo-cards-title">Mês</div>
+      <div class="page-subtitle">Clique para ver a lista de arquivos</div>
+      <div class="drill-grid" id="bases-tipo-cards-grid" style="grid-template-columns:1fr 1fr;max-width:520px;"></div>
+    </div>
+
+    <!-- NÍVEL 4 (Matriz): lista de arquivos (nome + link + data) -->
+    <div id="bases-file-list" style="display:none;">
+      <button class="back-link" onclick="backToBasesTipoCards()">← Voltar</button>
+      <div class="board-head">
+        <div>
+          <div class="page-title" id="bases-file-list-title">Análises</div>
+          <div class="page-subtitle" id="bases-file-list-subtitle"></div>
+        </div>
+        <button class="btn-primary" onclick="openBasesMatrizModal()">+ Nova entrada</button>
+      </div>
+      <div id="bases-file-list-items"></div>
+    </div>
+
+    <!-- DETALHE (Demais bases): lista simples de uma fornecedora -->
+    <div class="bases-sub" id="bases-sub-outras" style="display:none;">
+      <button class="back-link" onclick="showBasesCategoryList('outras')">← Fornecedoras · Demais bases</button>
+      <div class="kpi-row" id="bases-kpi-row"></div>
+      <div id="bases-filter-tag"></div>
+      <div class="board-head">
+        <div>
+          <div class="page-title" id="bases-outras-title">Demais bases</div>
+          <div class="page-subtitle">Bases avulsas, fora do ciclo semanal da matriz</div>
+        </div>
+        <button class="btn-primary" onclick="openBaseModal()">+ Nova base</button>
+      </div>
+      <div class="list-wrap" id="bases-list"></div>
+    </div>
+
+    <div class="footer-note">Dados salvos automaticamente no navegador.</div>
+  </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: CARD ===================== -->
+<div class="overlay" id="card-overlay">
+  <div class="modal">
+    <h3 id="card-modal-title">Nova demanda</h3>
+    <input type="hidden" id="card-id">
+    <div class="field">
+      <label>Título</label>
+      <input type="text" id="f-title" placeholder="Ex: Revisar reconciliação COMERC">
+    </div>
+    <div class="field">
+      <label>Descrição</label>
+      <textarea id="f-desc" placeholder="Detalhes da demanda..."></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Prioridade</label>
+        <select id="f-priority">
+          <option value="baixa">Baixa</option>
+          <option value="media" selected>Média</option>
+          <option value="alta">Alta</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Prazo</label>
+        <input type="date" id="f-due">
+      </div>
+    </div>
+    <div class="field">
+      <label>Tag</label>
+      <input type="text" id="f-tag" placeholder="Ex: fornecedora, billing, pessoal...">
+    </div>
+    <div class="field">
+      <label>Links / pastas / arquivos</label>
+      <div id="link-list"></div>
+      <button class="add-link-btn" onclick="addLinkRow()">+ adicionar link</button>
+    </div>
+    <div class="modal-actions">
+      <button class="link-del" id="card-delete-btn" onclick="deleteCard()" style="display:none;">Excluir demanda</button>
+      <div class="right">
+        <button class="btn-ghost" onclick="closeModal('card-overlay')">Cancelar</button>
+        <button class="btn-primary" onclick="saveCard()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: ROTINA ITEM ===================== -->
+<div class="overlay" id="routine-overlay">
+  <div class="modal">
+    <h3 id="routine-modal-title">Novo item de rotina</h3>
+    <input type="hidden" id="r-edit-day">
+    <input type="hidden" id="r-edit-id">
+    <div class="field" id="r-days-field">
+      <label>Dias da semana</label>
+      <div class="day-checks" id="r-days"></div>
+    </div>
+    <div class="field" id="r-day-label-field" style="display:none;">
+      <label>Dia</label>
+      <div id="r-day-label" style="font-size:13.5px;font-weight:bold;"></div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Horário (opcional)</label>
+        <input type="time" id="r-time">
+      </div>
+      <div class="field">
+        <label>Título</label>
+        <input type="text" id="r-title" placeholder="Ex: Enviar status fornecedoras">
+      </div>
+    </div>
+    <div class="field">
+      <label>Notas (opcional)</label>
+      <textarea id="r-notes" placeholder="Detalhes..."></textarea>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;">
+        <input type="checkbox" id="r-fixo" style="width:auto;accent-color:var(--green-light);"> 📌 Item fixo (parte da rotina permanente, não muda)
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="link-del" id="routine-delete-btn" onclick="deleteRoutineFromModal()" style="display:none;">Excluir item</button>
+      <div class="right">
+        <button class="btn-ghost" onclick="closeModal('routine-overlay')">Cancelar</button>
+        <button class="btn-primary" onclick="saveRoutineItem()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: ANOTAÇÃO MATRIZ ===================== -->
+<div class="overlay" id="anotacao-overlay">
+  <div class="modal">
+    <h3 id="anotacao-modal-title">Nova anotação</h3>
+    <input type="hidden" id="an-id">
+    <div class="field">
+      <label>Fornecedora</label>
+      <select id="an-fornecedora" onchange="handleFornSelectChange(this)"></select>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Status na fornecedora</label>
+        <select id="an-status-forn"></select>
+      </div>
+      <div class="field">
+        <label>Status no iGreen</label>
+        <select id="an-status-igreen"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="an-data" style="max-width:180px;">
+    </div>
+    <div class="field">
+      <label id="an-linhas-label">Anotações (quantidade + descrição)</label>
+      <div id="an-linhas-list"></div>
+      <button class="add-link-btn" id="an-add-linha-btn" onclick="addAnotacaoLinha()">+ adicionar linha</button>
+    </div>
+    <div class="modal-actions">
+      <button class="link-del" id="anotacao-delete-btn" onclick="deleteAnotacao()" style="display:none;">Excluir anotação</button>
+      <div class="right">
+        <button class="btn-ghost" onclick="closeModal('anotacao-overlay')">Cancelar</button>
+        <button class="btn-primary" onclick="saveAnotacao()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: CHAMADO ===================== -->
+<div class="overlay" id="chamado-overlay">
+  <div class="modal modal-chamado">
+    <div class="modal-header-bar">
+      <span id="chamado-modal-title">+ Novo Chamado</span>
+      <button class="modal-close-x" onclick="closeModal('chamado-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ch-id">
+      <div class="field">
+        <label>Fornecedora</label>
+        <select id="ch-fornecedora"></select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Tipo</label>
+          <select id="ch-tipo">
+            <option value="ticket">🎫 Ticket</option>
+            <option value="clickup">🔗 ClickUp</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>ID do chamado / Link</label>
+          <input type="text" id="ch-ref" placeholder="Ex: TKE4D779175 ou link do ClickUp">
+        </div>
+      </div>
+      <div class="field">
+        <label>Assunto</label>
+        <input type="text" id="ch-titulo" placeholder="Ex: Divergência de instalação">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Responsável</label>
+          <select id="ch-responsavel"></select>
+        </div>
+        <div class="field">
+          <label>Data de abertura</label>
+          <input type="date" id="ch-data-abertura">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Status</label>
+          <select id="ch-status"></select>
+        </div>
+        <div class="field">
+          <label>Quantidade de clientes</label>
+          <input type="text" inputmode="numeric" id="ch-qtd-clientes" placeholder="Ex: 260">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Time</label>
+          <select id="ch-time">
+            <option value="">— Nenhum —</option>
+            <option>Relacionamentos</option>
+            <option>TI</option>
+            <option>Contratos</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Categoria</label>
+          <select id="ch-categoria">
+            <option value="">— Nenhum —</option>
+            <option>Realocação</option>
+            <option>Correção</option>
+            <option>Devolutivas</option>
+            <option>Validação</option>
+            <option>Cancelamento</option>
+            <option>Reprovação</option>
+            <option>Reativação</option>
+            <option>Questionamento</option>
+            <option>Solicitações múltiplas</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>📦 Status fornecedora</label>
+          <select id="ch-status-forn"></select>
+        </div>
+        <div class="field">
+          <label>🌿 Status iGreen</label>
+          <select id="ch-status-igreen"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Descrição</label>
+        <textarea id="ch-descricao" placeholder="Descrição completa da solicitação"></textarea>
+      </div>
+      <div class="field">
+        <label>Próxima ação</label>
+        <textarea id="ch-proxima-acao" placeholder="Ex: Cobrar retorno da fornecedora"></textarea>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;">
+          <input type="checkbox" id="ch-matriz" style="width:auto;accent-color:var(--green-light);"> 🧩 Este chamado é referente à Matriz
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="link-del" id="chamado-delete-btn" onclick="deleteChamado()" style="display:none;">Excluir chamado</button>
+        <div class="right">
+          <button class="btn-ghost" onclick="closeModal('chamado-overlay')">Cancelar</button>
+          <button class="btn-primary" onclick="saveChamado()">Salvar chamado</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: BASE (demais bases) ===================== -->
+<div class="overlay" id="base-overlay">
+  <div class="modal">
+    <h3 id="base-modal-title">Nova base</h3>
+    <input type="hidden" id="bs-id">
+    <div class="field">
+      <label>Nome da base</label>
+      <input type="text" id="bs-nome" placeholder="Ex: Base Clientes 20-08">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Status</label>
+        <select id="bs-status"></select>
+      </div>
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="bs-data">
+      </div>
+    </div>
+    <div class="field">
+      <label>Link (opcional)</label>
+      <input type="text" id="bs-link" placeholder="https://...">
+    </div>
+    <div class="field">
+      <label>Observações</label>
+      <textarea id="bs-obs" placeholder="Detalhes da análise..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="link-del" id="base-delete-btn" onclick="deleteBase()" style="display:none;">Excluir base</button>
+      <div class="right">
+        <button class="btn-ghost" onclick="closeModal('base-overlay')">Cancelar</button>
+        <button class="btn-primary" onclick="saveBase()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: BASES DA MATRIZ (análise/ação) ===================== -->
+<div class="overlay" id="basesmatriz-overlay">
+  <div class="modal">
+    <h3 id="basesmatriz-modal-title">Nova entrada</h3>
+    <input type="hidden" id="bm-id">
+    <div class="field">
+      <label>Nome do arquivo</label>
+      <input type="text" id="bm-nome" placeholder="Ex: Análise 27.08.2026">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Tipo</label>
+        <select id="bm-tipo">
+          <option value="analise">🔎 Análise</option>
+          <option value="acao">⚙️ Ação</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="bm-data">
+      </div>
+    </div>
+    <div class="field">
+      <label>Link (opcional)</label>
+      <input type="text" id="bm-link" placeholder="https://...">
+    </div>
+    <div class="field">
+      <label>Observações (opcional)</label>
+      <textarea id="bm-obs" placeholder="Detalhes adicionais..."></textarea>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;">
+        <input type="checkbox" id="bm-tratado" style="width:auto;accent-color:var(--green-light);"> Já concluído
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="link-del" id="basesmatriz-delete-btn" onclick="deleteBasesMatriz()" style="display:none;">Excluir</button>
+      <div class="right">
+        <button class="btn-ghost" onclick="closeModal('basesmatriz-overlay')">Cancelar</button>
+        <button class="btn-primary" onclick="saveBasesMatriz()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   TEMA — claro (padrão iGreen) / escuro, persistido em localStorage
+   ========================================================================= */
+function aplicarTema(t){
+  document.documentElement.setAttribute("data-theme", t);
+  localStorage.setItem("meu-painel-theme", t);
+  const btn = document.getElementById("theme-toggle");
+  if(btn){
+    btn.innerHTML = t === "dark"
+      ? '<span class="nav-icon">☀️</span><span>Modo claro</span>'
+      : '<span class="nav-icon">🌙</span><span>Modo escuro</span>';
+  }
+}
+function alternarTema(){
+  const atual = document.documentElement.getAttribute("data-theme") || "light";
+  aplicarTema(atual === "dark" ? "light" : "dark");
+}
+aplicarTema(localStorage.getItem("meu-painel-theme") || "light");
+
+function toast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> el.classList.remove("show"), 3800);
+}
+
+/* =========================================================================
+   DADOS
+   ========================================================================= */
+const DAYS = [
+  {key:'seg', label:'Segunda'},
+  {key:'ter', label:'Terça'},
+  {key:'qua', label:'Quarta'},
+  {key:'qui', label:'Quinta'},
+  {key:'sex', label:'Sexta'},
+  {key:'sab', label:'Sábado'},
+  {key:'dom', label:'Domingo'},
+];
+const STORE_KEY = 'meu-painel-data-v2';
+
+/* =========================================================================
+   FIREBASE — sincronização em tempo real (entre navegadores/dispositivos)
+   ------------------------------------------------------------------------
+   1. Crie um projeto em https://console.firebase.google.com (gratuito).
+   2. No projeto, vá em "Build → Firestore Database" → "Criar banco de dados"
+      → modo de produção (as regras abaixo cuidam do acesso).
+   3. Em "Regras", cole:
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /meu-painel/{doc} {
+              allow read, write: if true;
+            }
+          }
+        }
+      (acesso liberado só pra quem tem o link do site — como combinado,
+      sem senha. Se quiser travar mais depois, é só trocar por Auth.)
+   4. Em "Configurações do projeto → Geral → Seus apps → Web (</>)",
+      registre um app e copie o objeto de configuração para dentro de
+      FIREBASE_CONFIG logo abaixo.
+   ========================================================================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB1cCKpR7aESClkt_lkEmORurbFixithHs",
+  authDomain: "meu-acompanhamento-analytics.firebaseapp.com",
+  projectId: "meu-acompanhamento-analytics",
+  storageBucket: "meu-acompanhamento-analytics.firebasestorage.app",
+  messagingSenderId: "22027973316",
+  appId: "1:22027973316:web:21f4a3f58212965ede8f91"
+};
+
+let db = null;
+let docRef = null;
+let isApplyingRemote = false;
+let pushTimer = null;
+
+function setSyncStatus(text){
+  const el = document.getElementById('sync-status');
+  if(el) el.textContent = text;
+}
+
+function firebaseConfigured(){
+  return !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
+}
+
+function initFirebase(){
+  if(!firebaseConfigured()){
+    setSyncStatus('💾 Só neste navegador');
+    return;
+  }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    docRef = db.collection('meu-painel').doc('estado');
+    setSyncStatus('🔄 Conectando...');
+
+    docRef.get().then(snap=>{
+      if(snap.exists && snap.data().state){
+        isApplyingRemote = true;
+        state = normalizeState(snap.data().state);
+        try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+        renderAll();
+        isApplyingRemote = false;
+        setSyncStatus('☁️ Sincronizado');
+        pushRemote();
+      } else {
+        pushRemote();
+      }
+      attachListener();
+    }).catch(err=>{
+      console.warn('Falha ao ler Firestore. Código:', err.code, '| Mensagem:', err.message, err);
+      setSyncStatus('⚠️ Sem conexão (' + (err.code || 'erro desconhecido') + ')');
+    });
+  }catch(err){
+    console.warn('Falha ao iniciar Firebase:', err);
+    setSyncStatus('⚠️ Firebase não configurado');
+  }
+}
+
+function attachListener(){
+  docRef.onSnapshot(snap=>{
+    if(isApplyingRemote) return;
+    if(!snap.exists || !snap.data().state) return;
+    isApplyingRemote = true;
+    state = normalizeState(snap.data().state);
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+    renderAll();
+    isApplyingRemote = false;
+    setSyncStatus('☁️ Sincronizado');
+  }, err=>{
+    console.warn('Falha na escuta em tempo real. Código:', err.code, '| Mensagem:', err.message, err);
+    setSyncStatus('⚠️ Sem conexão (' + (err.code || 'erro desconhecido') + ')');
+  });
+}
+
+function pushRemote(){
+  if(!docRef) return;
+  setSyncStatus('🔄 Salvando...');
+  docRef.set({ state, updatedAt: Date.now() })
+    .then(()=> setSyncStatus('☁️ Sincronizado'))
+    .catch(err=>{
+      console.warn('Falha ao salvar no Firestore. Código:', err.code, '| Mensagem:', err.message, err);
+      setSyncStatus('⚠️ Sem conexão (' + (err.code || 'erro desconhecido') + ')');
+    });
+}
+
+const DEFAULT_FORNECEDORAS = ['ATUA','BC','BOM FUTURO','COMERC','COTESA','EDP','FARO','FIT','GEDISA','GENIAL','GV','MATRIX','MONCARLO','ORIGO','REENERGISA','RESERVA','SOLATIO','SUNCLICK','SUNNE','THOPEN','ULTRA','VANTAGE'];
+function normalizeState(s){
+  s = s || {};
+  if(!s.demandas) s.demandas = [];
+  if(!s.rotina) s.rotina = Object.fromEntries(DAYS.map(d=>[d.key,[]]));
+  DAYS.forEach(d=>{ if(!s.rotina[d.key]) s.rotina[d.key] = []; });
+  if(!s.chamados) s.chamados = [];
+  if(!s.bases) s.bases = [];
+  if(!s.basesMatriz) s.basesMatriz = [];
+  if(!s.fornecedoras) s.fornecedoras = [];
+  s.fornecedoras = Array.from(new Set([...s.fornecedoras, ...DEFAULT_FORNECEDORAS]));
+  if(!s.anotacoes) s.anotacoes = [];
+  return s;
+}
+
+function loadData(){
+  const raw = localStorage.getItem(STORE_KEY);
+  if(raw){ try{ return normalizeState(JSON.parse(raw)); }catch(e){} }
+  return normalizeState({});
+}
+let state = loadData();
+try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+
+const STATUS_MATRIZ = ['Inexistente','Em ativação','Ativo','Cancelado','Devolvido'];
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+let selectedFornecedora = null;
+let selectedFornecedoraBases = null;
+let basesSubview = 'matriz';
+
+const STATUS_CHAMADO = {
+  iniciado:               { emoji:'🚀', label:'Iniciado' },
+  andamento:              { emoji:'⚙️', label:'Em andamento' },
+  aguardando_retorno:     { emoji:'📩', label:'Aguardando retorno' },
+  aguardando_fornecedora: { emoji:'⏳', label:'Aguardando fornecedora' },
+  concluido:              { emoji:'✔️', label:'Concluído' },
+  sem_conclusao:          { emoji:'🚫', label:'Finalizado sem conclusão' },
+};
+const RESPONSAVEIS = ['Illana','Roberto','Paulo','Outro'];
+function fillPlainSelect(sel, options, current){
+  sel.innerHTML = options.map(o=> `<option value="${escapeAttr(o)}" ${o===current?'selected':''}>${escapeHtml(o)}</option>`).join('');
+}
+const STATUS_BASE = {
+  a_iniciar:  { emoji:'🆕', label:'A iniciar' },
+  em_analise: { emoji:'🟡', label:'Em análise' },
+  processada: { emoji:'✅', label:'Processada' },
+};
+let chamadosFilter = null;
+let basesFilter = null;
+
+function saveState(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }catch(e){
+    toast("⚠️ Não foi possível salvar (armazenamento do navegador cheio).");
+  }
+  if(isApplyingRemote) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushRemote, 500);
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function resetarDados(){
+  if(!confirm("Isso apaga todas as demandas e itens de rotina salvos neste navegador. Continuar?")) return;
+  state = { demandas: [], rotina: Object.fromEntries(DAYS.map(d=>[d.key,[]])), weekKey: null, chamados: [], bases: [], basesMatriz: [], fornecedoras: [], anotacoes: [] };
+  chamadosFilter = null; basesFilter = null; selectedFornecedora = null; selectedFornecedoraBases = null; basesSubview = 'matriz';
+  basesCategory = null; selectedBasesMonth = null; selectedBasesTipo = null; matrizSelectedForn = null; matrizSelectedMonth = null;
+  saveState();
+  renderAll();
+  toast("Dados resetados.");
+}
+
+/* =========================================================================
+   SEMANA
+   ========================================================================= */
+function getMonday(d){
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+function getWeekKey(d){ return getMonday(d).toISOString().slice(0,10); }
+function fmt(d){ return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}); }
+function checkWeekReset(){
+  const currentWeek = getWeekKey(new Date());
+  if(state.weekKey !== currentWeek){
+    DAYS.forEach(d=> state.rotina[d.key].forEach(item => item.done = false));
+    state.weekKey = currentWeek;
+    saveState();
+  }
+}
+function resetWeek(){
+  if(!confirm('Reiniciar todas as marcações desta semana?')) return;
+  DAYS.forEach(d=> state.rotina[d.key].forEach(item => item.done = false));
+  saveState();
+  renderRotina();
+  toast("Marcações reiniciadas.");
+}
+
+/* =========================================================================
+   NAVEGAÇÃO
+   ========================================================================= */
+function switchPage(pageKey){
+  document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.page===pageKey));
+  document.querySelectorAll('.page').forEach(p=> p.classList.remove('active'));
+  const el = document.getElementById('page-'+pageKey);
+  if(el) el.classList.add('active');
+  if(pageKey==='inicio') renderInicio();
+  if(pageKey==='bases') showBasesOverview();
+  if(pageKey==='matriz') showMatrizFornCards();
+  toggleSidebar(false);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchPage(btn.dataset.page));
+});
+function toggleSidebar(force){
+  const sb = document.getElementById('sidebar');
+  if(!sb) return;
+  const open = typeof force === 'boolean' ? force : !sb.classList.contains('open');
+  sb.classList.toggle('open', open);
+}
+
+/* =========================================================================
+   KANBAN — RENDER
+   ========================================================================= */
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function dueChipHtml(due, status){
+  if(!due) return '';
+  const today = todayStr();
+  let cls = 'chip due';
+  if(status !== 'done'){
+    if(due < today) cls += ' late';
+    else{
+      const diffDays = (new Date(due) - new Date(today)) / 86400000;
+      if(diffDays <= 3) cls += ' soon';
+    }
+  }
+  const [y,m,dd] = due.split('-');
+  return `<span class="${cls}">📅 ${dd}/${m}</span>`;
+}
+
+function renderKpis(){
+  const total = state.demandas.length;
+  const doing = state.demandas.filter(c=>c.status==='doing').length;
+  const done = state.demandas.filter(c=>c.status==='done').length;
+  const late = state.demandas.filter(c=> c.due && c.due < todayStr() && c.status !== 'done').length;
+  document.getElementById('kpi-row').innerHTML = `
+    ${kpiCardHtml({icon:'📋', num:total, label:'Total'})}
+    ${kpiCardHtml({icon:'⚙️', num:doing, label:'Em andamento'})}
+    ${kpiCardHtml({icon:'✅', num:done, label:'Concluídas'})}
+    ${kpiCardHtml({icon:'⏰', num:late, label:'Atrasadas'})}
+  `;
+}
+
+function renderBoard(){
+  const cols = {todo:[], doing:[], waiting:[], done:[]};
+  state.demandas.forEach(c => cols[c.status]?.push(c));
+
+  ['todo','doing','waiting','done'].forEach(status=>{
+    const el = document.getElementById('col-'+status);
+    document.getElementById('count-'+status).textContent = cols[status].length;
+    el.innerHTML = cols[status].length
+      ? cols[status].map(c => cardHtml(c)).join('')
+      : `<div class="empty-hint">Nenhuma demanda aqui</div>`;
+  });
+
+  renderKpis();
+
+  document.querySelectorAll('.card').forEach(cardEl=>{
+    cardEl.addEventListener('dragstart', ()=> cardEl.classList.add('dragging'));
+    cardEl.addEventListener('dragend', ()=> cardEl.classList.remove('dragging'));
+  });
+  renderInicio();
+}
+
+function cardHtml(c){
+  const linksHtml = (c.links && c.links.length)
+    ? `<div class="card-links">${c.links.map(l=>`<a href="${escapeAttr(l.url)}" target="_blank" rel="noopener">🔗 ${escapeHtml(l.label || l.url)}</a>`).join('')}</div>`
+    : '';
+  const order = ['todo','doing','waiting','done'];
+  const idx = order.indexOf(c.status);
+  const canLeft = idx > 0, canRight = idx < order.length - 1;
+  return `
+    <div class="card p-${c.priority}" draggable="true" data-id="${c.id}" ondragstart="onDragStart(event,'${c.id}')">
+      <div class="card-title">${escapeHtml(c.title)}</div>
+      ${c.desc ? `<div class="card-desc">${escapeHtml(c.desc)}</div>` : ''}
+      <div class="card-meta">
+        ${c.tag ? `<span class="chip">${escapeHtml(c.tag)}</span>` : ''}
+        ${dueChipHtml(c.due, c.status)}
+      </div>
+      ${linksHtml}
+      <div class="card-actions">
+        <div class="move-btns">
+          <button class="mini-btn" onclick="moveCard('${c.id}',-1)" ${canLeft?'':'disabled style="opacity:.25;cursor:default;"'}>◀</button>
+          <button class="mini-btn" onclick="moveCard('${c.id}',1)" ${canRight?'':'disabled style="opacity:.25;cursor:default;"'}>▶</button>
+        </div>
+        <button class="mini-btn" onclick="openCardModal('${c.id}')">✎ editar</button>
+      </div>
+    </div>`;
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function kpiCardHtml({icon, num, label, onClick, active}){
+  return `<div class="kpi-card ${onClick?'clickable':''} ${active?'kpi-active':''}" ${onClick?`onclick="${onClick}"`:''}>
+    <div class="kpi-icon">${icon}</div>
+    <div><div class="kpi-num">${num}</div><div class="kpi-label">${label}</div></div>
+  </div>`;
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function moveCard(id, dir){
+  const order = ['todo','doing','waiting','done'];
+  const c = state.demandas.find(x=>x.id===id);
+  if(!c) return;
+  const idx = order.indexOf(c.status) + dir;
+  if(idx < 0 || idx >= order.length) return;
+  c.status = order[idx];
+  saveState();
+  renderBoard();
+}
+
+let draggedId = null;
+function onDragStart(e, id){ draggedId = id; e.dataTransfer.effectAllowed = 'move'; }
+function onDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('dragover'); }
+document.querySelectorAll('.column').forEach(col=> col.addEventListener('dragleave', ()=> col.classList.remove('dragover')));
+function onDrop(e){
+  e.preventDefault();
+  const col = e.currentTarget;
+  col.classList.remove('dragover');
+  const c = state.demandas.find(x=>x.id===draggedId);
+  if(c){ c.status = col.dataset.status; saveState(); renderBoard(); }
+  draggedId = null;
+}
+
+/* =========================================================================
+   KANBAN — MODAL
+   ========================================================================= */
+function openCardModal(id){
+  document.getElementById('card-modal-title').textContent = id ? 'Editar demanda' : 'Nova demanda';
+  document.getElementById('card-id').value = id || '';
+  document.getElementById('card-delete-btn').style.display = id ? 'inline' : 'none';
+
+  const c = id ? state.demandas.find(x=>x.id===id) : null;
+  document.getElementById('f-title').value = c?.title || '';
+  document.getElementById('f-desc').value = c?.desc || '';
+  document.getElementById('f-priority').value = c?.priority || 'media';
+  document.getElementById('f-due').value = c?.due || '';
+  document.getElementById('f-tag').value = c?.tag || '';
+
+  document.getElementById('link-list').innerHTML = '';
+  (c?.links || []).forEach(l => addLinkRow(l.label, l.url));
+
+  document.getElementById('card-overlay').classList.add('open');
+}
+function addLinkRow(label='', url=''){
+  const wrap = document.getElementById('link-list');
+  const row = document.createElement('div');
+  row.className = 'link-row';
+  row.innerHTML = `
+    <input type="text" placeholder="rótulo (ex: pasta drive)" value="${escapeAttr(label)}" class="l-label" style="max-width:150px;">
+    <input type="text" placeholder="https://..." value="${escapeAttr(url)}" class="l-url">
+    <button type="button" onclick="this.parentElement.remove()">✕</button>`;
+  wrap.appendChild(row);
+}
+function saveCard(){
+  const title = document.getElementById('f-title').value.trim();
+  if(!title){ toast('Dá um título pra demanda 🙂'); return; }
+  const id = document.getElementById('card-id').value || uid();
+  const links = Array.from(document.querySelectorAll('#link-list .link-row')).map(row=>({
+    label: row.querySelector('.l-label').value.trim(),
+    url: row.querySelector('.l-url').value.trim()
+  })).filter(l => l.url);
+
+  const existing = state.demandas.find(x=>x.id===id);
+  const card = {
+    id, title,
+    desc: document.getElementById('f-desc').value.trim(),
+    priority: document.getElementById('f-priority').value,
+    due: document.getElementById('f-due').value,
+    tag: document.getElementById('f-tag').value.trim(),
+    links,
+    status: existing?.status || 'todo',
+    createdAt: existing?.createdAt || Date.now(),
+    updatedAt: Date.now()
+  };
+  if(existing) Object.assign(existing, card);
+  else state.demandas.push(card);
+
+  saveState();
+  renderBoard();
+  closeModal('card-overlay');
+  toast(existing ? 'Demanda atualizada.' : 'Demanda criada.');
+}
+function deleteCard(){
+  const id = document.getElementById('card-id').value;
+  if(!id) return;
+  if(!confirm('Excluir esta demanda?')) return;
+  state.demandas = state.demandas.filter(x=>x.id!==id);
+  saveState();
+  renderBoard();
+  closeModal('card-overlay');
+  toast('Demanda excluída.');
+}
+
+/* =========================================================================
+   ROTINA — RENDER
+   ========================================================================= */
+function renderRotina(){
+  checkWeekReset();
+  const monday = getMonday(new Date());
+  const sunday = new Date(monday); sunday.setDate(sunday.getDate()+6);
+  document.getElementById('week-dates').textContent = `Semana de ${fmt(monday)} a ${fmt(sunday)}`;
+
+  const todayIdx = (new Date().getDay() + 6) % 7;
+
+  document.getElementById('week-grid').innerHTML = DAYS.map((d, i) => {
+    const date = new Date(monday); date.setDate(date.getDate() + i);
+    const items = state.rotina[d.key] || [];
+    const doneCount = items.filter(it=>it.done).length;
+    const pct = items.length ? Math.round(doneCount/items.length*100) : 0;
+    const isToday = i === todayIdx;
+
+    const itemsHtml = items.length
+      ? items.slice().sort((a,b)=> {
+          if(!!b.fixo !== !!a.fixo) return (b.fixo?1:0) - (a.fixo?1:0);
+          return (a.time||'99:99').localeCompare(b.time||'99:99');
+        }).map(it => `
+          <div class="routine-item ${it.done?'done':''} ${it.fixo?'fixo':''}">
+            <input type="checkbox" ${it.done?'checked':''} onchange="toggleRoutine('${d.key}','${it.id}')">
+            <div class="r-body">
+              ${it.time ? `<span class="r-time">${it.time}</span>` : ''}
+              <div class="r-title">${it.fixo ? '<span class="r-pin">📌</span>' : ''}${escapeHtml(it.title)}</div>
+              ${it.notes ? `<div class="r-notes">${escapeHtml(it.notes)}</div>` : ''}
+            </div>
+            <button class="mini-btn r-del" onclick="editRoutine('${d.key}','${it.id}')" title="Editar">✎</button>
+            <button class="mini-btn r-del" onclick="deleteRoutine('${d.key}','${it.id}')" title="Excluir">✕</button>
+          </div>`).join('')
+      : `<div class="empty-hint" style="padding:6px 2px;">Sem itens</div>`;
+
+    return `
+      <div class="day-col ${isToday?'today':''}">
+        <div class="day-name">${d.label}</div>
+        <div class="day-date">${fmt(date)}${isToday?' · hoje':''}</div>
+        <div class="day-progress"><div class="day-progress-bar" style="width:${pct}%"></div></div>
+        <div style="margin-top:8px;">${itemsHtml}</div>
+        <button class="add-item-btn" onclick="openRoutineModal('${d.key}')">+ adicionar item</button>
+      </div>`;
+  }).join('');
+  renderInicio();
+}
+
+function toggleRoutine(dayKey, id){
+  const item = state.rotina[dayKey].find(i=>i.id===id);
+  if(item){ item.done = !item.done; saveState(); renderRotina(); }
+}
+function deleteRoutine(dayKey, id){
+  const item = state.rotina[dayKey].find(i=>i.id===id);
+  const msg = item?.fixo
+    ? '⚠️ Este é um item FIXO da rotina. Tem certeza que quer excluir?'
+    : 'Excluir este item?';
+  if(!confirm(msg)) return;
+  state.rotina[dayKey] = state.rotina[dayKey].filter(i=>i.id!==id);
+  saveState();
+  renderRotina();
+  toast('Item removido.');
+}
+
+/* =========================================================================
+   ROTINA — MODAL
+   ========================================================================= */
+function openRoutineModal(presetDay){
+  document.getElementById('routine-modal-title').textContent = 'Novo item de rotina';
+  document.getElementById('r-edit-day').value = '';
+  document.getElementById('r-edit-id').value = '';
+  document.getElementById('r-days-field').style.display = '';
+  document.getElementById('r-day-label-field').style.display = 'none';
+  document.getElementById('routine-delete-btn').style.display = 'none';
+  document.getElementById('r-time').value = '';
+  document.getElementById('r-title').value = '';
+  document.getElementById('r-notes').value = '';
+  document.getElementById('r-fixo').checked = false;
+  document.getElementById('r-days').innerHTML = DAYS.map(d => `
+    <label><input type="checkbox" value="${d.key}" ${d.key===presetDay?'checked':''}>${d.label.slice(0,3)}</label>
+  `).join('');
+  document.getElementById('routine-overlay').classList.add('open');
+}
+function editRoutine(dayKey, id){
+  const item = state.rotina[dayKey].find(i=>i.id===id);
+  if(!item) return;
+  document.getElementById('routine-modal-title').textContent = 'Editar item de rotina';
+  document.getElementById('r-edit-day').value = dayKey;
+  document.getElementById('r-edit-id').value = id;
+  document.getElementById('r-days-field').style.display = 'none';
+  document.getElementById('r-day-label-field').style.display = '';
+  document.getElementById('r-day-label').textContent = DAYS.find(d=>d.key===dayKey)?.label || dayKey;
+  document.getElementById('routine-delete-btn').style.display = 'inline';
+  document.getElementById('r-time').value = item.time || '';
+  document.getElementById('r-title').value = item.title || '';
+  document.getElementById('r-notes').value = item.notes || '';
+  document.getElementById('r-fixo').checked = !!item.fixo;
+  document.getElementById('routine-overlay').classList.add('open');
+}
+function saveRoutineItem(){
+  const title = document.getElementById('r-title').value.trim();
+  if(!title){ toast('Dá um título pro item de rotina 🙂'); return; }
+  const time = document.getElementById('r-time').value;
+  const notes = document.getElementById('r-notes').value.trim();
+  const fixo = document.getElementById('r-fixo').checked;
+  const editId = document.getElementById('r-edit-id').value;
+  const editDay = document.getElementById('r-edit-day').value;
+
+  if(editId && editDay){
+    const item = state.rotina[editDay].find(i=>i.id===editId);
+    if(item){ item.time = time; item.title = title; item.notes = notes; item.fixo = fixo; }
+    saveState();
+    renderRotina();
+    closeModal('routine-overlay');
+    toast('Item atualizado.');
+    return;
+  }
+
+  const selectedDays = Array.from(document.querySelectorAll('#r-days input:checked')).map(cb=>cb.value);
+  if(selectedDays.length===0){ toast('Escolhe pelo menos um dia.'); return; }
+  selectedDays.forEach(dayKey=> state.rotina[dayKey].push({ id: uid(), time, title, notes, fixo, done:false }));
+  saveState();
+  renderRotina();
+  closeModal('routine-overlay');
+  toast('Item de rotina salvo.');
+}
+function deleteRoutineFromModal(){
+  const editId = document.getElementById('r-edit-id').value;
+  const editDay = document.getElementById('r-edit-day').value;
+  if(!editId || !editDay) return;
+  closeModal('routine-overlay');
+  deleteRoutine(editDay, editId);
+}
+
+/* =========================================================================
+   CHAMADOS
+   ========================================================================= */
+function fillStatusSelect(selectEl, statusMap, current){
+  selectEl.innerHTML = Object.entries(statusMap).map(([k,v])=>
+    `<option value="${k}" ${k===current?'selected':''}>${v.emoji} ${v.label}</option>`
+  ).join('');
+}
+
+function renderChamadoKpis(){
+  const total = state.chamados.length;
+  const porStatus = {};
+  Object.keys(STATUS_CHAMADO).forEach(k=> porStatus[k] = state.chamados.filter(c=>c.status===k).length);
+
+  const cards = [
+    {key:null, icon:'🎫', label:'Total', num:total},
+    {key:'iniciado', icon:'🚀', label:'Iniciados', num:porStatus.iniciado},
+    {key:'andamento', icon:'⚙️', label:'Em andamento', num:porStatus.andamento},
+    {key:'aguardando_retorno', icon:'📩', label:'Aguard. retorno', num:porStatus.aguardando_retorno},
+    {key:'aguardando_fornecedora', icon:'⏳', label:'Aguard. fornecedora', num:porStatus.aguardando_fornecedora},
+    {key:'concluido', icon:'✔️', label:'Concluídos', num:porStatus.concluido},
+    {key:'sem_conclusao', icon:'🚫', label:'Sem conclusão', num:porStatus.sem_conclusao},
+  ];
+  document.getElementById('chamados-kpi-row').innerHTML = cards.map(c=>
+    kpiCardHtml({icon:c.icon, num:c.num, label:c.label, active:chamadosFilter===c.key,
+      onClick:`setChamadosFilter(${c.key?`'${c.key}'`:null})`})
+  ).join('');
+  document.getElementById('chamados-kpi-row').style.gridTemplateColumns = 'repeat(4, 1fr)';
+
+  const tagEl = document.getElementById('chamados-filter-tag');
+  tagEl.innerHTML = chamadosFilter
+    ? `<span class="filter-tag">Filtrando: ${STATUS_CHAMADO[chamadosFilter].emoji} ${STATUS_CHAMADO[chamadosFilter].label}<button onclick="setChamadosFilter(null)">✕</button></span>`
+    : '';
+}
+function setChamadosFilter(key){
+  chamadosFilter = chamadosFilter === key ? null : key;
+  renderChamados();
+}
+
+function renderChamados(){
+  renderChamadoKpis();
+  const list = chamadosFilter ? state.chamados.filter(c=>c.status===chamadosFilter) : state.chamados;
+  const ordered = list.slice().sort((a,b)=> (b.dataAbertura||'').localeCompare(a.dataAbertura||''));
+  const tbody = document.getElementById('chamados-tbody');
+  const emptyEl = document.getElementById('chamados-empty');
+  tbody.innerHTML = ordered.map(c=>chamadoRowHtml(c)).join('');
+  tbody.closest('table').style.display = ordered.length ? '' : 'none';
+  emptyEl.style.display = ordered.length ? 'none' : 'block';
+  emptyEl.innerHTML = chamadosFilter
+    ? '📋<br>Nenhum chamado com esse status.'
+    : '📋<br>Nenhum chamado registrado ainda.<br><span style="font-size:11.5px;">Clique em "+ Novo chamado" para abrir um ticket.</span>';
+  renderInicio();
+}
+
+function chamadoRowHtml(c){
+  const meta = STATUS_CHAMADO[c.status];
+  const dataFmt = c.dataAbertura ? c.dataAbertura.split('-').reverse().join('/') : '';
+  const tipoIcon = c.tipo === 'clickup' ? '🔗' : '🎫';
+  const ref = c.ref || c.link || '—';
+  const tipoLabel = c.tipo === 'clickup' ? 'ClickUp' : 'Ticket';
+  return `
+    <tr onclick="openChamadoModal('${c.id}')">
+      <td class="dt-ticket">${tipoIcon} ${escapeHtml(ref)}</td>
+      <td>
+        <div class="dt-assunto">${escapeHtml(c.titulo)}</div>
+        ${c.categoria ? `<div class="dt-sub">${escapeHtml(c.categoria)}</div>` : ''}
+      </td>
+      <td>${escapeHtml(c.fornecedora || '—')} · ${tipoLabel}${c.matriz ? ' <span class="chip" style="margin-left:4px;">🧩 Matriz</span>' : ''}</td>
+      <td><span class="status-badge">${meta.emoji} ${meta.label}</span></td>
+      <td>${dataFmt || '—'}</td>
+      <td><button class="dt-edit" onclick="event.stopPropagation(); openChamadoModal('${c.id}')">✎</button></td>
+    </tr>`;
+}
+
+function fillFornecedoraSelect(sel, current, allowAdd){
+  const list = listFornecedoras();
+  sel.innerHTML = list.map(f=>`<option value="${escapeAttr(f)}" ${f===current?'selected':''}>${escapeHtml(f)}</option>`).join('')
+    + (allowAdd ? `<option value="__nova__">+ nova fornecedora...</option>` : '');
+}
+function handleFornSelectChange(sel){
+  if(sel.value !== '__nova__') return;
+  const nome = prompt('Nome da fornecedora:');
+  if(nome && nome.trim()){
+    const clean = nome.trim().toUpperCase();
+    if(!state.fornecedoras.includes(clean)) state.fornecedoras.push(clean);
+    saveState();
+    fillFornecedoraSelect(sel, clean, true);
+  } else {
+    fillFornecedoraSelect(sel, listFornecedoras()[0] || '', true);
+  }
+}
+
+function openChamadoModal(id){
+  document.getElementById('chamado-modal-title').textContent = id ? '✎ Editar Chamado' : '+ Novo Chamado';
+  document.getElementById('ch-id').value = id || '';
+  document.getElementById('chamado-delete-btn').style.display = id ? 'inline' : 'none';
+
+  const c = id ? state.chamados.find(x=>x.id===id) : null;
+
+  fillFornecedoraSelect(document.getElementById('ch-fornecedora'), c?.fornecedora || selectedFornecedora || listFornecedoras()[0] || '');
+  document.getElementById('ch-tipo').value = c?.tipo || 'ticket';
+  document.getElementById('ch-ref').value = c?.ref || c?.link || '';
+  document.getElementById('ch-titulo').value = c?.titulo || '';
+  fillPlainSelect(document.getElementById('ch-responsavel'), RESPONSAVEIS, c?.responsavel || RESPONSAVEIS[0]);
+  document.getElementById('ch-data-abertura').value = c?.dataAbertura || todayStr();
+  fillStatusSelect(document.getElementById('ch-status'), STATUS_CHAMADO, c?.status || 'iniciado');
+  document.getElementById('ch-qtd-clientes').value = c?.quantidadeClientes || '';
+  document.getElementById('ch-time').value = c?.time || '';
+  document.getElementById('ch-categoria').value = c?.categoria || '';
+
+  const fillMatriz = (sel,current)=> sel.innerHTML = STATUS_MATRIZ.map(s=>`<option value="${s}" ${s===current?'selected':''}>${s}</option>`).join('');
+  fillMatriz(document.getElementById('ch-status-forn'), c?.statusForn || 'Inexistente');
+  fillMatriz(document.getElementById('ch-status-igreen'), c?.statusIgreen || 'Inexistente');
+
+  document.getElementById('ch-descricao').value = c?.descricao || c?.obs || '';
+  document.getElementById('ch-proxima-acao').value = c?.proximaAcao || '';
+  document.getElementById('ch-matriz').checked = !!c?.matriz;
+
+  document.getElementById('chamado-overlay').classList.add('open');
+}
+function saveChamado(){
+  const titulo = document.getElementById('ch-titulo').value.trim();
+  if(!titulo){ toast('Dá um assunto pro chamado 🙂'); return; }
+  const id = document.getElementById('ch-id').value || uid();
+  const existing = state.chamados.find(x=>x.id===id);
+  const fornecedoraVal = document.getElementById('ch-fornecedora').value;
+  const fornecedora = fornecedoraVal === '__nova__' ? '' : fornecedoraVal;
+  if(fornecedora && !state.fornecedoras.includes(fornecedora)) state.fornecedoras.push(fornecedora);
+
+  const chamado = {
+    id, titulo, fornecedora,
+    tipo: document.getElementById('ch-tipo').value,
+    ref: document.getElementById('ch-ref').value.trim(),
+    responsavel: document.getElementById('ch-responsavel').value,
+    status: document.getElementById('ch-status').value,
+    dataAbertura: document.getElementById('ch-data-abertura').value || todayStr(),
+    quantidadeClientes: Number(document.getElementById('ch-qtd-clientes').value.replace(/\D/g,'')) || 0,
+    time: document.getElementById('ch-time').value,
+    categoria: document.getElementById('ch-categoria').value,
+    statusForn: document.getElementById('ch-status-forn').value,
+    statusIgreen: document.getElementById('ch-status-igreen').value,
+    descricao: document.getElementById('ch-descricao').value.trim(),
+    proximaAcao: document.getElementById('ch-proxima-acao').value.trim(),
+    matriz: document.getElementById('ch-matriz').checked,
+    updatedAt: Date.now(),
+  };
+  if(existing) Object.assign(existing, chamado);
+  else state.chamados.push(chamado);
+
+  saveState();
+  renderChamados();
+  renderInicio();
+  closeModal('chamado-overlay');
+  toast(existing ? 'Chamado atualizado.' : 'Chamado criado.');
+}
+function deleteChamado(){
+  const id = document.getElementById('ch-id').value;
+  if(!id) return;
+  if(!confirm('Excluir este chamado?')) return;
+  state.chamados = state.chamados.filter(x=>x.id!==id);
+  saveState();
+  renderChamados();
+  renderInicio();
+  closeModal('chamado-overlay');
+  toast('Chamado excluído.');
+}
+
+/* =========================================================================
+   BASES — visão geral → categoria → fornecedora → (Matriz: mês → tipo → arquivos)
+   ========================================================================= */
+let basesCategory = null;          // 'matriz' | 'outras'
+let selectedBasesMonth = null;     // 'YYYY-MM' (só matriz)
+let selectedBasesTipo = null;      // 'analise' | 'acao' (só matriz)
+
+function countBasesPorForn(list){
+  const counts = {};
+  list.forEach(b=>{ if(b.fornecedora) counts[b.fornecedora] = (counts[b.fornecedora]||0)+1; });
+  return counts;
+}
+function hideAllBasesLevels(){
+  ['bases-overview','bases-forn-cards','bases-month-cards','bases-tipo-cards','bases-file-list','bases-sub-outras']
+    .forEach(id=> document.getElementById(id).style.display = 'none');
+}
+
+function showBasesOverview(){
+  basesCategory = null; selectedFornecedoraBases = null; selectedBasesMonth = null; selectedBasesTipo = null;
+  hideAllBasesLevels();
+  document.getElementById('bases-overview').style.display = '';
+  renderBasesOverview();
+}
+function showBasesCategoryList(cat){
+  basesCategory = cat; selectedFornecedoraBases = null; selectedBasesMonth = null; selectedBasesTipo = null;
+  hideAllBasesLevels();
+  document.getElementById('bases-forn-cards').style.display = '';
+  renderBasesFornCards();
+}
+function selectBasesForn(forn){
+  selectedFornecedoraBases = forn;
+  if(basesCategory === 'outras'){
+    hideAllBasesLevels();
+    document.getElementById('bases-sub-outras').style.display = '';
+    document.getElementById('bases-outras-title').textContent = `Demais bases — ${forn}`;
+    renderBasesOutras();
+    return;
+  }
+  selectedBasesMonth = null; selectedBasesTipo = null;
+  hideAllBasesLevels();
+  document.getElementById('bases-month-cards').style.display = '';
+  renderBasesMonthCards();
+}
+function backToBasesMonthCards(){
+  selectedBasesTipo = null;
+  hideAllBasesLevels();
+  document.getElementById('bases-month-cards').style.display = '';
+  renderBasesMonthCards();
+}
+function selectBasesMonth(mk){
+  selectedBasesMonth = mk;
+  hideAllBasesLevels();
+  document.getElementById('bases-tipo-cards').style.display = '';
+  renderBasesTipoCards();
+}
+function backToBasesTipoCards(){
+  selectedBasesTipo = null;
+  hideAllBasesLevels();
+  document.getElementById('bases-tipo-cards').style.display = '';
+  renderBasesTipoCards();
+}
+function selectBasesTipo(tipo){
+  selectedBasesTipo = tipo;
+  hideAllBasesLevels();
+  document.getElementById('bases-file-list').style.display = '';
+  renderBasesFileList();
+}
+
+function renderBasesOverview(){
+  const totalGeral = state.bases.length + state.basesMatriz.length;
+  const now = new Date();
+  const esteMes = [...state.bases, ...state.basesMatriz].filter(b=>{
+    if(!b.data) return false;
+    const d = new Date(b.data);
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  }).length;
+  const pendentesGeral = state.basesMatriz.filter(b=>!b.tratado).length + state.bases.filter(b=>b.status!=='processada').length;
+  const fornAtivas = new Set([...state.bases.map(b=>b.fornecedora), ...state.basesMatriz.map(b=>b.fornecedora)].filter(Boolean)).size;
+
+  document.getElementById('bases-overview-kpi-row').innerHTML = `
+    ${kpiCardHtml({icon:'📦', num:totalGeral, label:'Total geral'})}
+    ${kpiCardHtml({icon:'📅', num:esteMes, label:'Este mês'})}
+    ${kpiCardHtml({icon:'⏳', num:pendentesGeral, label:'Pendentes'})}
+    ${kpiCardHtml({icon:'🏢', num:fornAtivas, label:'Fornecedoras ativas'})}
+  `;
+  document.getElementById('bases-cat-grid').innerHTML = `
+    <div class="cat-card" onclick="showBasesCategoryList('matriz')">
+      <div class="cat-icon">📊</div>
+      <div><div class="cat-title">Matriz</div><div class="cat-sub">Análises e ações por mês</div></div>
+      <div class="cat-num">${state.basesMatriz.length}</div>
+    </div>
+    <div class="cat-card" onclick="showBasesCategoryList('outras')">
+      <div class="cat-icon">📁</div>
+      <div><div class="cat-title">Demais bases</div><div class="cat-sub">Bases avulsas, fora do ciclo semanal</div></div>
+      <div class="cat-num">${state.bases.length}</div>
+    </div>
+  `;
+}
+
+/* ---------- Nível 1: cards de fornecedora ---------- */
+function renderBasesFornCards(){
+  const list = basesCategory === 'matriz' ? state.basesMatriz : state.bases;
+  const counts = countBasesPorForn(list);
+  const allForn = listFornecedoras();
+
+  document.getElementById('bases-forn-cards-title').textContent = basesCategory === 'matriz' ? '📊 Matriz' : '📁 Demais bases';
+  document.getElementById('bases-breakdown-forn-select').innerHTML = allForn.map(f=>`<option value="${escapeAttr(f)}">${escapeHtml(f)}</option>`).join('');
+
+  document.getElementById('bases-forn-cards-grid').innerHTML = allForn.map(f=>`
+    <div class="drill-card" onclick="selectBasesForn('${escapeAttr(f)}')">
+      <div class="dc-icon">🏢</div>
+      <div class="dc-title">${escapeHtml(f)}</div>
+      <div class="dc-num">${counts[f]||0}</div>
+      <div class="dc-label">arquivo(s)</div>
+    </div>`).join('');
+}
+function goToBasesFornFromSelect(){
+  const f = document.getElementById('bases-breakdown-forn-select').value;
+  if(f) selectBasesForn(f);
+}
+
+/* ---------- Nível 2 (Matriz): cards de mês ---------- */
+function renderBasesMonthCards(){
+  const items = state.basesMatriz.filter(b=>b.fornecedora===selectedFornecedoraBases);
+  document.getElementById('bases-month-cards-title').textContent = `🏢 ${selectedFornecedoraBases}`;
+  const existingMonths = items.map(b=>(b.data||'').slice(0,7)).filter(Boolean);
+  const months = getMonthRange(existingMonths);
+  const counts = {};
+  items.forEach(b=>{ const mk=(b.data||'').slice(0,7); if(mk) counts[mk]=(counts[mk]||0)+1; });
+  document.getElementById('bases-month-cards-grid').innerHTML = months.map(mk=>`
+    <div class="drill-card" onclick="selectBasesMonth('${mk}')">
+      <div class="dc-icon">📅</div>
+      <div class="dc-title">${monthLabel(mk)}</div>
+      <div class="dc-num">${counts[mk]||0}</div>
+      <div class="dc-label">arquivo(s)</div>
+    </div>`).join('');
+}
+
+/* ---------- Nível 3 (Matriz): cards Análises / Ações ---------- */
+function renderBasesTipoCards(){
+  const items = state.basesMatriz.filter(b=> b.fornecedora===selectedFornecedoraBases && (b.data||'').slice(0,7)===selectedBasesMonth);
+  document.getElementById('bases-tipo-cards-title').textContent = `🏢 ${selectedFornecedoraBases} · ${monthLabel(selectedBasesMonth)}`;
+  const analises = items.filter(b=>b.tipo==='analise').length;
+  const acoes = items.filter(b=>b.tipo==='acao').length;
+  document.getElementById('bases-tipo-cards-grid').innerHTML = `
+    <div class="drill-card" onclick="selectBasesTipo('analise')">
+      <div class="dc-icon">🔎</div>
+      <div class="dc-title">Análises</div>
+      <div class="dc-num">${analises}</div>
+      <div class="dc-label">arquivo(s)</div>
+    </div>
+    <div class="drill-card" onclick="selectBasesTipo('acao')">
+      <div class="dc-icon">⚙️</div>
+      <div class="dc-title">Ações</div>
+      <div class="dc-num">${acoes}</div>
+      <div class="dc-label">arquivo(s)</div>
+    </div>`;
+}
+
+/* ---------- Nível 4 (Matriz): lista de arquivos ---------- */
+function renderBasesFileList(){
+  const items = state.basesMatriz.filter(b=>
+    b.fornecedora===selectedFornecedoraBases && (b.data||'').slice(0,7)===selectedBasesMonth && b.tipo===selectedBasesTipo
+  ).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+
+  document.getElementById('bases-file-list-title').textContent = selectedBasesTipo==='analise' ? '🔎 Análises' : '⚙️ Ações';
+  document.getElementById('bases-file-list-subtitle').textContent = `🏢 ${selectedFornecedoraBases} · ${monthLabel(selectedBasesMonth)}`;
+
+  const el = document.getElementById('bases-file-list-items');
+  if(items.length===0){
+    el.innerHTML = `<div class="empty-hint">Nenhum arquivo aqui ainda. Clique em "+ Nova entrada" pra adicionar.</div>`;
+    return;
+  }
+  el.innerHTML = items.map(b=>{
+    const dataFmt = b.data ? b.data.split('-').reverse().join('/') : '';
+    const nome = b.nome || `${selectedBasesTipo==='analise'?'Análise':'Ações'} - ${dataFmt}`;
+    return `
+      <div class="file-row">
+        <input type="checkbox" ${b.tratado?'checked':''} onchange="toggleBasesMatrizTratado('${b.id}')">
+        <div class="file-row-icon">📄</div>
+        <div class="file-row-body">
+          <div class="file-row-name ${b.tratado?'tratado-text':''}">${escapeHtml(nome)}</div>
+          <div class="file-row-meta">${dataFmt}${b.link ? ` · <a href="${escapeAttr(b.link)}" target="_blank" rel="noopener">🔗 abrir arquivo</a>` : ''}${b.obs ? ` · ${escapeHtml(b.obs)}` : ''}</div>
+        </div>
+        <div class="file-row-actions">
+          <button class="mini-btn" onclick="openBasesMatrizModal('${b.id}')">✎</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+function toggleBasesMatrizTratado(id){
+  const b = state.basesMatriz.find(x=>x.id===id);
+  if(!b) return;
+  b.tratado = !b.tratado;
+  saveState();
+  renderBasesFileList();
+  renderInicio();
+}
+
+function openBasesMatrizModal(id){
+  if(!id && (!selectedFornecedoraBases || !selectedBasesTipo)){ toast('Escolha a fornecedora, o mês e o tipo (Análises/Ações) primeiro 🙂'); return; }
+  document.getElementById('basesmatriz-modal-title').textContent = id ? 'Editar entrada' : 'Nova entrada';
+  document.getElementById('bm-id').value = id || '';
+  document.getElementById('basesmatriz-delete-btn').style.display = id ? 'inline' : 'none';
+
+  const b = id ? state.basesMatriz.find(x=>x.id===id) : null;
+  document.getElementById('bm-nome').value = b?.nome || '';
+  document.getElementById('bm-tipo').value = b?.tipo || selectedBasesTipo || 'analise';
+  let defaultDate = todayStr();
+  if(!b && selectedBasesMonth){
+    defaultDate = selectedBasesMonth === todayStr().slice(0,7) ? todayStr() : `${selectedBasesMonth}-01`;
+  }
+  document.getElementById('bm-data').value = b?.data || defaultDate;
+  document.getElementById('bm-obs').value = b?.obs || '';
+  document.getElementById('bm-link').value = b?.link || '';
+  document.getElementById('bm-tratado').checked = !!b?.tratado;
+
+  document.getElementById('basesmatriz-overlay').classList.add('open');
+}
+function saveBasesMatriz(){
+  if(!selectedFornecedoraBases){ toast('Selecione uma fornecedora primeiro 🙂'); return; }
+  const nome = document.getElementById('bm-nome').value.trim();
+  if(!nome){ toast('Dá um nome pro arquivo 🙂'); return; }
+  const id = document.getElementById('bm-id').value || uid();
+  const existing = state.basesMatriz.find(x=>x.id===id);
+  const item = {
+    id, nome,
+    fornecedora: existing?.fornecedora || selectedFornecedoraBases,
+    tipo: document.getElementById('bm-tipo').value,
+    data: document.getElementById('bm-data').value || todayStr(),
+    obs: document.getElementById('bm-obs').value.trim(),
+    link: document.getElementById('bm-link').value.trim(),
+    tratado: document.getElementById('bm-tratado').checked,
+    updatedAt: Date.now(),
+  };
+  if(existing) Object.assign(existing, item);
+  else state.basesMatriz.push(item);
+
+  saveState();
+  selectedBasesMonth = item.data.slice(0,7);
+  selectedBasesTipo = item.tipo;
+  hideAllBasesLevels();
+  document.getElementById('bases-file-list').style.display = '';
+  renderBasesFileList();
+  renderInicio();
+  closeModal('basesmatriz-overlay');
+  toast(existing ? 'Entrada atualizada.' : 'Entrada registrada.');
+}
+function deleteBasesMatriz(){
+  const id = document.getElementById('bm-id').value;
+  if(!id) return;
+  if(!confirm('Excluir esta entrada?')) return;
+  state.basesMatriz = state.basesMatriz.filter(x=>x.id!==id);
+  saveState();
+  renderBasesFileList();
+  renderInicio();
+  closeModal('basesmatriz-overlay');
+  toast('Entrada excluída.');
+}
+
+/* ---------- Detalhe (Demais bases): lista simples de uma fornecedora ---------- */
+function renderBaseKpis(){
+  const items = selectedFornecedoraBases ? state.bases.filter(b=>b.fornecedora===selectedFornecedoraBases) : [];
+  const total = items.length;
+  const porStatus = {};
+  Object.keys(STATUS_BASE).forEach(k=> porStatus[k] = items.filter(b=>b.status===k).length);
+  const now = new Date();
+  const mesAtual = items.filter(b=>{
+    if(!b.data) return false;
+    const d = new Date(b.data);
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  }).length;
+
+  const cards = [
+    {key:null, icon:'📂', label:'Total', num:total},
+    {key:'processada', icon:'✅', label:'Processadas', num:porStatus.processada},
+    {key:'em_analise', icon:'🔎', label:'Em análise', num:porStatus.em_analise},
+    {key:'a_iniciar', icon:'🆕', label:'A iniciar', num:porStatus.a_iniciar},
+  ];
+  document.getElementById('bases-kpi-row').innerHTML = cards.map(c=>
+    kpiCardHtml({icon:c.icon, num:c.num, label:c.label, active:basesFilter===c.key,
+      onClick:`setBasesFilter(${c.key?`'${c.key}'`:null})`})
+  ).join('');
+
+  const tagEl = document.getElementById('bases-filter-tag');
+  tagEl.innerHTML = basesFilter
+    ? `<span class="filter-tag">Filtrando: ${STATUS_BASE[basesFilter].emoji} ${STATUS_BASE[basesFilter].label}<button onclick="setBasesFilter(null)">✕</button></span>`
+    : `<span class="filter-tag" style="background:transparent;padding:0;margin-bottom:12px;">📊 ${mesAtual} tratada(s) este mês</span>`;
+}
+function setBasesFilter(key){
+  basesFilter = basesFilter === key ? null : key;
+  renderBasesOutras();
+}
+function renderBasesOutras(){
+  renderBaseKpis();
+  const base = selectedFornecedoraBases ? state.bases.filter(b=>b.fornecedora===selectedFornecedoraBases) : [];
+  const list = basesFilter ? base.filter(b=>b.status===basesFilter) : base;
+  const ordered = list.slice().sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+  const el = document.getElementById('bases-list');
+  el.innerHTML = ordered.length
+    ? ordered.map(b=>baseItemHtml(b)).join('')
+    : `<div class="empty-hint">${basesFilter ? 'Nenhuma base com esse status.' : 'Nenhuma base registrada ainda.'}</div>`;
+  renderInicio();
+}
+function baseItemHtml(b){
+  const meta = STATUS_BASE[b.status];
+  const dataFmt = b.data ? b.data.split('-').reverse().join('/') : '';
+  const statusOpts = Object.entries(STATUS_BASE).map(([k,v])=>
+    `<option value="${k}" ${k===b.status?'selected':''}>${v.emoji} ${v.label}</option>`).join('');
+  return `
+    <div class="list-item bs-${b.status}">
+      <div class="item-top">
+        <div>
+          <div class="item-title">${escapeHtml(b.nome)}</div>
+          <div class="item-meta">${dataFmt}</div>
+        </div>
+        <span class="status-badge">${meta.emoji} ${meta.label}</span>
+      </div>
+      ${b.obs ? `<div class="item-desc">${escapeHtml(b.obs)}</div>` : ''}
+      ${b.link ? `<div class="item-links"><a href="${escapeAttr(b.link)}" target="_blank" rel="noopener">🔗 abrir link</a></div>` : ''}
+      <div class="edit-status-row">
+        <select id="bs-status-${b.id}">${statusOpts}</select>
+        <button class="mini-btn" onclick="atualizarStatusBase('${b.id}')">Atualizar status</button>
+      </div>
+      <div class="item-actions">
+        <button class="mini-btn" onclick="openBaseModal('${b.id}')">✎ editar</button>
+      </div>
+    </div>`;
+}
+function atualizarStatusBase(id){
+  const b = state.bases.find(x=>x.id===id);
+  const select = document.getElementById('bs-status-'+id);
+  if(!b || !select) return;
+  b.status = select.value;
+  saveState();
+  renderBasesOutras();
+  toast('Status da base atualizado.');
+}
+function openBaseModal(id){
+  if(!id && !selectedFornecedoraBases){ toast('Selecione (ou adicione) uma fornecedora primeiro 🙂'); return; }
+  document.getElementById('base-modal-title').textContent = id ? 'Editar base' : 'Nova base';
+  document.getElementById('bs-id').value = id || '';
+  document.getElementById('base-delete-btn').style.display = id ? 'inline' : 'none';
+
+  const b = id ? state.bases.find(x=>x.id===id) : null;
+  document.getElementById('bs-nome').value = b?.nome || '';
+  document.getElementById('bs-data').value = b?.data || todayStr();
+  document.getElementById('bs-link').value = b?.link || '';
+  document.getElementById('bs-obs').value = b?.obs || '';
+  fillStatusSelect(document.getElementById('bs-status'), STATUS_BASE, b?.status || 'a_iniciar');
+
+  document.getElementById('base-overlay').classList.add('open');
+}
+function saveBase(){
+  const nome = document.getElementById('bs-nome').value.trim();
+  if(!nome){ toast('Dá um nome pra base 🙂'); return; }
+  const id = document.getElementById('bs-id').value || uid();
+  const existing = state.bases.find(x=>x.id===id);
+  const base = {
+    id, nome,
+    fornecedora: existing?.fornecedora || selectedFornecedoraBases,
+    status: document.getElementById('bs-status').value,
+    data: document.getElementById('bs-data').value || todayStr(),
+    link: document.getElementById('bs-link').value.trim(),
+    obs: document.getElementById('bs-obs').value.trim(),
+    updatedAt: Date.now(),
+  };
+  if(existing) Object.assign(existing, base);
+  else state.bases.push(base);
+
+  saveState();
+  renderBasesOutras();
+  closeModal('base-overlay');
+  toast(existing ? 'Base atualizada.' : 'Base registrada.');
+}
+function deleteBase(){
+  const id = document.getElementById('bs-id').value;
+  if(!id) return;
+  if(!confirm('Excluir esta base?')) return;
+  state.bases = state.bases.filter(x=>x.id!==id);
+  saveState();
+  renderBasesOutras();
+  closeModal('base-overlay');
+  toast('Base excluída.');
+}
+
+/* =========================================================================
+   MATRIZ — ANOTAÇÕES: fornecedora → mês → dia
+   ========================================================================= */
+function listFornecedoras(){
+  const fromNotes = state.anotacoes.map(a=>a.fornecedora);
+  const fromBases = state.bases.map(b=>b.fornecedora).filter(Boolean);
+  const fromBasesMatriz = state.basesMatriz.map(b=>b.fornecedora).filter(Boolean);
+  const fromChamados = state.chamados.map(c=>c.fornecedora).filter(Boolean);
+  const all = Array.from(new Set([...state.fornecedoras, ...fromNotes, ...fromBases, ...fromBasesMatriz, ...fromChamados])).filter(Boolean);
+  return all.sort((a,b)=>a.localeCompare(b));
+}
+/* Gera as chaves de mês (YYYY-MM) de agosto/2026 até 2 meses à frente do mês atual,
+   garantindo que qualquer mês com dados fora dessa janela também apareça. */
+function getMonthRange(extraKeys){
+  const start = new Date(2026, 7, 1); // agosto/2026
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth()+2, 1);
+  const keys = [];
+  let d = new Date(start);
+  while(d <= end){
+    keys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    d.setMonth(d.getMonth()+1);
+  }
+  (extraKeys||[]).forEach(k=>{ if(k && !keys.includes(k)) keys.push(k); });
+  return keys.sort();
+}
+function monthLabel(mk){
+  const [y,m] = mk.split('-');
+  return `${MESES_PT[Number(m)-1]} ${y}`;
+}
+
+let matrizSelectedForn = null;
+let matrizSelectedMonth = null;
+
+function showMatrizFornCards(){
+  matrizSelectedForn = null; matrizSelectedMonth = null;
+  document.getElementById('matriz-forn-cards').style.display = '';
+  document.getElementById('matriz-month-cards').style.display = 'none';
+  document.getElementById('matriz-day-list').style.display = 'none';
+  renderMatrizFornCards();
+}
+function backToMatrizFornCards(){ showMatrizFornCards(); }
+function selectMatrizForn(f){
+  matrizSelectedForn = f; matrizSelectedMonth = null;
+  document.getElementById('matriz-forn-cards').style.display = 'none';
+  document.getElementById('matriz-month-cards').style.display = '';
+  document.getElementById('matriz-day-list').style.display = 'none';
+  renderMatrizMonthCards();
+}
+function backToMatrizMonthCards(){
+  document.getElementById('matriz-month-cards').style.display = '';
+  document.getElementById('matriz-day-list').style.display = 'none';
+  renderMatrizMonthCards();
+}
+function selectMatrizMonth(mk){
+  matrizSelectedMonth = mk;
+  document.getElementById('matriz-month-cards').style.display = 'none';
+  document.getElementById('matriz-day-list').style.display = '';
+  renderMatrizDayList();
+}
+
+function renderMatrizFornCards(){
+  const totalClientes = state.anotacoes.reduce((s,a)=> s + (Number(a.quantidade)||0), 0);
+  const fornAtivas = new Set(state.anotacoes.map(a=>a.fornecedora)).size;
+  const pendentes = state.anotacoes.filter(a=>!a.tratado).length;
+  document.getElementById('matriz-overview-kpi-row').innerHTML = `
+    ${kpiCardHtml({icon:'👥', num:totalClientes.toLocaleString('pt-BR'), label:'Clientes envolvidos'})}
+    ${kpiCardHtml({icon:'📝', num:state.anotacoes.length, label:'Anotações no total'})}
+    ${kpiCardHtml({icon:'🏢', num:fornAtivas, label:'Fornecedoras ativas'})}
+    ${kpiCardHtml({icon:'⏳', num:pendentes, label:'Pendentes'})}
+  `;
+  const list = listFornecedoras();
+  const counts = {};
+  state.anotacoes.forEach(a=>{ counts[a.fornecedora] = (counts[a.fornecedora]||0)+1; });
+  document.getElementById('matriz-forn-cards-grid').innerHTML = list.map(f=>`
+    <div class="drill-card" onclick="selectMatrizForn('${escapeAttr(f)}')">
+      <div class="dc-icon">🏢</div>
+      <div class="dc-title">${escapeHtml(f)}</div>
+      <div class="dc-num">${counts[f]||0}</div>
+      <div class="dc-label">anotação(ões)</div>
+    </div>`).join('');
+  renderInicio();
+}
+
+function renderMatrizMonthCards(){
+  const notasForn = state.anotacoes.filter(a=>a.fornecedora===matrizSelectedForn);
+  document.getElementById('matriz-month-cards-title').textContent = `🏢 ${matrizSelectedForn}`;
+  const existingMonths = notasForn.map(a=>(a.data||'').slice(0,7)).filter(Boolean);
+  const months = getMonthRange(existingMonths);
+  const counts = {};
+  notasForn.forEach(a=>{ const mk=(a.data||'').slice(0,7); if(mk) counts[mk]=(counts[mk]||0)+1; });
+  document.getElementById('matriz-month-cards-grid').innerHTML = months.map(mk=>`
+    <div class="drill-card" onclick="selectMatrizMonth('${mk}')">
+      <div class="dc-icon">📅</div>
+      <div class="dc-title">${monthLabel(mk)}</div>
+      <div class="dc-num">${counts[mk]||0}</div>
+      <div class="dc-label">anotação(ões)</div>
+    </div>`).join('');
+}
+
+function renderMatrizDayList(){
+  const notas = state.anotacoes.filter(a=> a.fornecedora===matrizSelectedForn && (a.data||'').slice(0,7)===matrizSelectedMonth);
+  document.getElementById('matriz-day-list-title').textContent = `🏢 ${matrizSelectedForn} · ${monthLabel(matrizSelectedMonth)}`;
+  const el = document.getElementById('matriz-day-list-items');
+  if(notas.length===0){
+    el.innerHTML = `<div class="empty-hint">Nenhuma anotação registrada ainda nesse mês. Clique em "+ Nova anotação" pra começar.</div>`;
+    return;
+  }
+  const byDay = {};
+  notas.forEach(a=>{ const day=a.data||'sem-data'; if(!byDay[day]) byDay[day]=[]; byDay[day].push(a); });
+  const dayKeys = Object.keys(byDay).sort().reverse();
+
+  el.innerHTML = dayKeys.map(day=>{
+    const dataFmt = day!=='sem-data' ? day.split('-').reverse().join('/') : 'Sem data';
+    const itemsHtml = byDay[day].map(a=>`
+      <div class="anot-item ${a.tratado?'tratado':''}">
+        <input type="checkbox" ${a.tratado?'checked':''} onchange="toggleTratado('${a.id}')">
+        <div class="anot-qtd">${Number(a.quantidade||0).toLocaleString('pt-BR')}</div>
+        <div class="anot-body">
+          <div class="anot-desc ${a.tratado?'tratado-text':''}">${escapeHtml(a.descricao)}</div>
+          <div class="anot-meta">${escapeHtml(a.statusForn)} → ${escapeHtml(a.statusIgreen)}</div>
+        </div>
+        <div class="anot-actions">
+          <button class="mini-btn" onclick="openAnotacaoModal('${a.id}')">✎</button>
+        </div>
+      </div>`).join('');
+    return `
+      <div class="combo-group">
+        <div class="combo-head">
+          <div class="combo-title">📆 ${dataFmt}</div>
+          <div class="combo-total">${byDay[day].length} anotação(ões)</div>
+        </div>
+        <div class="combo-body">${itemsHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+function toggleTratado(id){
+  const a = state.anotacoes.find(x=>x.id===id);
+  if(!a) return;
+  a.tratado = !a.tratado;
+  saveState();
+  renderMatrizDayList();
+}
+
+/* ---------- Modal: fornecedora + combo + linhas (quantidade+descrição) em lote ---------- */
+function addAnotacaoLinha(quantidade='', descricao=''){
+  const wrap = document.getElementById('an-linhas-list');
+  const row = document.createElement('div');
+  row.className = 'an-linha-row';
+  row.innerHTML = `
+    <input type="text" inputmode="numeric" class="an-qtd" placeholder="Qtd" value="${escapeAttr(quantidade)}">
+    <input type="text" class="an-desc" placeholder="Ex: enviados para questionamento de motivo de cancelamento" value="${escapeAttr(descricao)}">
+    <button type="button" onclick="this.parentElement.remove()">✕</button>`;
+  wrap.appendChild(row);
+}
+function openAnotacaoModal(id){
+  document.getElementById('anotacao-modal-title').textContent = id ? 'Editar anotação' : 'Nova anotação';
+  document.getElementById('an-id').value = id || '';
+  document.getElementById('anotacao-delete-btn').style.display = id ? 'inline' : 'none';
+
+  const a = id ? state.anotacoes.find(x=>x.id===id) : null;
+  fillFornecedoraSelect(document.getElementById('an-fornecedora'), a?.fornecedora || matrizSelectedForn || listFornecedoras()[0] || '', true);
+
+  const fillMatrizSelect = (sel, current) => {
+    sel.innerHTML = STATUS_MATRIZ.map(s=>`<option value="${s}" ${s===current?'selected':''}>${s}</option>`).join('');
+  };
+  fillMatrizSelect(document.getElementById('an-status-forn'), a?.statusForn || 'Inexistente');
+  fillMatrizSelect(document.getElementById('an-status-igreen'), a?.statusIgreen || 'Inexistente');
+  let defaultDate = todayStr();
+  if(!a && matrizSelectedMonth){
+    defaultDate = matrizSelectedMonth === todayStr().slice(0,7) ? todayStr() : `${matrizSelectedMonth}-01`;
+  }
+  document.getElementById('an-data').value = a?.data || defaultDate;
+
+  document.getElementById('an-linhas-list').innerHTML = '';
+  if(a){
+    document.getElementById('an-linhas-label').textContent = 'Anotação (quantidade + descrição)';
+    document.getElementById('an-add-linha-btn').style.display = 'none';
+    addAnotacaoLinha(a.quantidade, a.descricao);
+  } else {
+    document.getElementById('an-linhas-label').textContent = 'Anotações (quantidade + descrição) — adicione quantas linhas quiser';
+    document.getElementById('an-add-linha-btn').style.display = 'inline';
+    addAnotacaoLinha();
+  }
+
+  document.getElementById('anotacao-overlay').classList.add('open');
+}
+function saveAnotacao(){
+  const fornecedoraVal = document.getElementById('an-fornecedora').value;
+  const fornecedora = fornecedoraVal === '__nova__' ? '' : fornecedoraVal;
+  if(!fornecedora){ toast('Selecione a fornecedora 🙂'); return; }
+
+  const statusForn = document.getElementById('an-status-forn').value;
+  const statusIgreen = document.getElementById('an-status-igreen').value;
+  const data = document.getElementById('an-data').value || todayStr();
+  const editId = document.getElementById('an-id').value;
+
+  const rows = Array.from(document.querySelectorAll('#an-linhas-list .an-linha-row')).map(row=>({
+    quantidade: Number(row.querySelector('.an-qtd').value.replace(/\D/g,'')) || 0,
+    descricao: row.querySelector('.an-desc').value.trim(),
+  })).filter(r => r.descricao);
+
+  if(rows.length===0){ toast('Escreve pelo menos uma anotação 🙂'); return; }
+  if(!state.fornecedoras.includes(fornecedora)) state.fornecedoras.push(fornecedora);
+
+  if(editId){
+    const existing = state.anotacoes.find(x=>x.id===editId);
+    if(existing){
+      Object.assign(existing, { fornecedora, statusForn, statusIgreen, data, ...rows[0], updatedAt: Date.now() });
+    }
+    rows.slice(1).forEach(r=>{
+      state.anotacoes.push({ id: uid(), fornecedora, statusForn, statusIgreen, data, tratado:false, updatedAt: Date.now(), ...r });
+    });
+  } else {
+    rows.forEach(r=>{
+      state.anotacoes.push({ id: uid(), fornecedora, statusForn, statusIgreen, data, tratado:false, updatedAt: Date.now(), ...r });
+    });
+  }
+
+  saveState();
+  matrizSelectedForn = fornecedora;
+  matrizSelectedMonth = data.slice(0,7);
+  document.getElementById('matriz-forn-cards').style.display = 'none';
+  document.getElementById('matriz-month-cards').style.display = 'none';
+  document.getElementById('matriz-day-list').style.display = '';
+  renderMatrizDayList();
+  closeModal('anotacao-overlay');
+  toast(editId ? 'Anotação atualizada.' : `${rows.length} anotação(ões) registrada(s).`);
+}
+function deleteAnotacao(){
+  const id = document.getElementById('an-id').value;
+  if(!id) return;
+  if(!confirm('Excluir esta anotação?')) return;
+  state.anotacoes = state.anotacoes.filter(x=>x.id!==id);
+  saveState();
+  renderMatrizDayList();
+  closeModal('anotacao-overlay');
+  toast('Anotação excluída.');
+}
+
+/* =========================================================================
+   MODAL COMUM
+   ========================================================================= */
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target === ov) closeModal(ov.id); });
+});
+
+/* =========================================================================
+   INÍCIO — VISÃO GERAL
+   ========================================================================= */
+const PRIO_LABEL = { alta:'Alta', media:'Média', baixa:'Baixa' };
+function getGreeting(){
+  const h = new Date().getHours();
+  if(h < 12) return { text:'Bom dia!', icon:'☀️', sub:'Tenha um dia incrível.' };
+  if(h < 18) return { text:'Boa tarde!', icon:'🌤️', sub:'Continue assim, tá indo bem.' };
+  return { text:'Boa noite!', icon:'🌙', sub:'Hora de desacelerar também.' };
+}
+function relTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const hm = d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  if(d.toDateString() === now.toDateString()) return `Hoje, ${hm}`;
+  const y = new Date(now); y.setDate(now.getDate()-1);
+  if(d.toDateString() === y.toDateString()) return `Ontem, ${hm}`;
+  return fmt(d);
+}
+function getRecentActivity(){
+  const items = [];
+  state.demandas.forEach(d=> items.push({title:d.title, area:'Demandas', icon:'📋', ts:d.updatedAt||d.createdAt||0, key:'demandas'}));
+  state.chamados.forEach(c=> items.push({title:c.titulo, area:'Chamados', icon:'🎫', ts:c.updatedAt||0, key:'chamados'}));
+  state.anotacoes.forEach(a=> items.push({title:`${a.fornecedora} · ${a.statusForn} → ${a.statusIgreen}`, area:'Matriz', icon:'🧩', ts:a.updatedAt||0, key:'matriz'}));
+  state.bases.forEach(b=> items.push({title:b.nome, area:'Bases', icon:'📂', ts:b.updatedAt||0, key:'bases'}));
+  state.basesMatriz.forEach(b=> items.push({title:`${b.tipo==='analise'?'Análise':'Ações'} · ${b.fornecedora}`, area:'Bases · Matriz', icon:'📊', ts:b.updatedAt||0, key:'bases'}));
+  return items.filter(i=>i.ts).sort((a,b)=> b.ts - a.ts).slice(0,5);
+}
+
+function renderInicio(){
+  /* Cabeçalho de saudação */
+  const g = getGreeting();
+  document.getElementById('inicio-greeting').textContent = 'Olá, Illana! 👋';
+  document.getElementById('pill-greeting-icon').textContent = g.icon;
+  document.getElementById('pill-greeting-main').textContent = g.text;
+  document.getElementById('pill-greeting-sub').textContent = g.sub;
+  const hoje = new Date();
+  const dowFull = hoje.toLocaleDateString('pt-BR', {weekday:'long'});
+  document.getElementById('pill-date-main').textContent = dowFull.charAt(0).toUpperCase()+dowFull.slice(1);
+  document.getElementById('pill-date-sub').textContent = hoje.toLocaleDateString('pt-BR', {day:'2-digit', month:'long', year:'numeric'});
+
+  /* Foco de hoje: até 3 demandas pendentes, prioridade alta primeiro */
+  const pendentes = state.demandas.filter(c=>c.status!=='done');
+  const prioOrder = {alta:0, media:1, baixa:2};
+  const foco = pendentes.slice().sort((a,b)=>{
+    const pa = prioOrder[a.priority] ?? 3, pb = prioOrder[b.priority] ?? 3;
+    if(pa!==pb) return pa-pb;
+    return (a.due||'9999').localeCompare(b.due||'9999');
+  }).slice(0,3);
+
+  document.getElementById('foco-sub').textContent = foco.length
+    ? `${foco.length} coisa(s) principal(is) para focar`
+    : 'Nenhuma demanda pendente — bom trabalho!';
+  document.getElementById('foco-list').innerHTML = foco.length
+    ? foco.map(c=>`
+        <div class="foco-item">
+          <input type="checkbox" onchange="marcarFocoConcluido('${c.id}')">
+          <span class="foco-dot p-${c.priority}" style="width:8px;height:8px;border-radius:50%;"></span>
+          <span class="foco-item-title">${escapeHtml(c.title)}</span>
+          <span class="foco-chip ${c.priority}">${PRIO_LABEL[c.priority]||c.priority}</span>
+        </div>`).join('')
+    : `<div class="foco-empty">Tudo em dia por aqui 🎉</div>`;
+  document.getElementById('foco-right-num').textContent = pendentes.length;
+
+  /* Acesso rápido */
+  const totalDemandas = state.demandas.length;
+  const totalAnot = state.anotacoes.length;
+  const fornCount = listFornecedoras().length;
+  const hojeIdx = (new Date().getDay() + 6) % 7;
+  const hojeKey = DAYS[hojeIdx].key;
+  const itensHoje = state.rotina[hojeKey] || [];
+  const doneHoje = itensHoje.filter(i=>i.done).length;
+  const totalChamados = state.chamados.length;
+  const chamadosAbertos = state.chamados.filter(c=>c.status!=='concluido' && c.status!=='sem_conclusao').length;
+  const totalBases = state.bases.length + state.basesMatriz.length;
+
+  const cards = [
+    { key:'demandas', icon:'📋', title:'Demandas', sub:`${totalDemandas} no total` },
+    { key:'matriz', icon:'🧩', title:'Matriz', sub:`${fornCount} fornecedora(s) · ${totalAnot} anotações` },
+    { key:'rotina', icon:'🗓️', title:'Rotina', sub:`Hoje: ${doneHoje}/${itensHoje.length} feitos` },
+    { key:'chamados', icon:'🎫', title:'Chamados', sub:`${chamadosAbertos} em aberto` },
+    { key:'bases', icon:'📂', title:'Bases', sub:`${totalBases} tratadas` },
+  ];
+  document.getElementById('quick-grid').innerHTML = cards.map(c=>`
+    <div class="quick-card" onclick="switchPage('${c.key}')">
+      <div class="qc-icon-box">${c.icon}</div>
+      <div class="qc-title">${c.title}</div>
+      <div class="qc-sub">${c.sub}</div>
+      <div class="qc-underline"></div>
+    </div>`).join('');
+
+  /* Próximos dias (próximos dias úteis, com itens fixos/da rotina) */
+  const DOW_ABBR = ['SEG','TER','QUA','QUI','SEX','SAB','DOM'];
+  const proximosDias = [];
+  let d = new Date();
+  let guard = 0;
+  while(proximosDias.length < 3 && guard < 14){
+    guard++;
+    d = new Date(d); d.setDate(d.getDate()+1);
+    const dow = (d.getDay()+6)%7; // 0=seg
+    if(dow >= 5) continue; // pula sáb/dom
+    proximosDias.push({ date:new Date(d), dow });
+  }
+  const proximosHtml = proximosDias.map(({date, dow})=>{
+    const dayKey = DAYS[dow].key;
+    const items = (state.rotina[dayKey]||[]).slice().sort((a,b)=>{
+      if(!!b.fixo !== !!a.fixo) return (b.fixo?1:0)-(a.fixo?1:0);
+      return (a.time||'99:99').localeCompare(b.time||'99:99');
+    });
+    const first = items[0];
+    return `
+      <div class="day-row">
+        <div class="day-badge"><div class="db-dow">${DOW_ABBR[dow]}</div><div class="db-num">${String(date.getDate()).padStart(2,'0')}</div></div>
+        <div class="day-row-body">
+          <div class="day-row-title">${first ? escapeHtml(first.title) : 'Sem itens agendados'}</div>
+          <div class="day-row-sub">${first?.notes ? escapeHtml(first.notes) : (items.length>1 ? `+${items.length-1} outro(s) item(ns)` : '')}</div>
+        </div>
+        <div class="day-row-cal">📅</div>
+      </div>`;
+  }).join('');
+  document.getElementById('proximos-dias-list').innerHTML = proximosHtml || `<div class="panel-empty">Nenhum item de rotina cadastrado ainda.</div>`;
+
+  /* Atividade recente */
+  const atividades = getRecentActivity();
+  document.getElementById('atividade-recente-list').innerHTML = atividades.length
+    ? atividades.map(a=>`
+        <div class="activity-row">
+          <div class="activity-icon">${a.icon}</div>
+          <div class="activity-body">
+            <div class="activity-title">${escapeHtml(a.title||'(sem título)')}</div>
+            <span class="activity-tag">${a.area}</span>
+          </div>
+          <div class="activity-time">${relTime(a.ts)}</div>
+        </div>`).join('')
+    : `<div class="panel-empty">Nenhuma atividade registrada ainda.</div>`;
+}
+function marcarFocoConcluido(id){
+  const c = state.demandas.find(x=>x.id===id);
+  if(!c) return;
+  c.status = 'done';
+  c.updatedAt = Date.now();
+  saveState();
+  renderBoard();
+  toast('Demanda concluída 🎉');
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+function renderAll(){
+  renderBoard();
+  showMatrizFornCards();
+  renderRotina();
+  renderChamados();
+  renderBasesOverview();
+  renderInicio();
+}
+renderAll();
+initFirebase();
+</script>
+</body>
+</html>
